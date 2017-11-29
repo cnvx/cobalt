@@ -166,3 +166,14 @@ def load_test_data():
 download_data_set()
 images_train, classes_train, labels_train = load_training_data()
 images_test, classes_test, labels_test = load_test_data()
+
+''' Placeholder varialbes for the neural network '''
+
+# Images used as input
+x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
+
+# Real lables associated with each image
+y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
+
+# Real class numbers
+y_actual_class_numbers = tf.argmax(y_actual, axis = 1)
