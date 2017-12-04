@@ -2,7 +2,6 @@
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import prettytensor as pt
 import numpy as np
 from sklearn.metrics import confusion_matrix
 import time
@@ -79,7 +78,6 @@ def load_data(filename):
 
 # Download and extract the data set if it doesn't already exist
 def download_data_set():
-
     # Output the download progress
     def print_progress(count, block_size, total_size):
         percentage = float(count * block_size) / total_size
@@ -177,3 +175,26 @@ y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 
 
 # Real class numbers
 y_actual_class_numbers = tf.argmax(y_actual, axis = 1)
+
+''' Image processing '''
+
+# If the image is training data make random modifications, if not just crop it
+def process_image(image, training_data):
+    if training_data:
+        image = tf.random_crop(image, size = [image_size_cropped, image_size_cropped, number_of_channels])
+        image = tf.image.random_flip_left_right(image)
+        image = tf.image.random_hue(image, max_delta = 0.05)
+        image = tf.image.random_contrast(image, lower = 0.3, upper = 1.0)
+        image = tf.image.random_saturation(image, lower = 0.0, upper = 2.0)
+        image = tf.image.random_brightness(image, max_delta = 2.0)
+
+        # Stop tf.image.random_contrast() from outputting extreme values
+        image = tf.minimum(image, 1.0)
+        image = tf.maximum(image, 0.0)
+    else:
+        image = tf.image.resize_image_with_crop_or_pad(image, target_height = image_size_cropped, target_width = image_size_cropped)
+
+    return image
+
+# Put the images inside a TensorFlow graph
+processed_images = tf.map_fn(lambda image: process_image(image, training_data = True), x)
