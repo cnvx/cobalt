@@ -219,3 +219,15 @@ def convolve(x, W):
 
 def max_pool(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'SAME')
+
+''' First convolutional layer '''
+
+W_conv1 = weight_variable([5, 5, 3, 64])
+b_conv1 = bias_variable([64])
+
+# Convolve the input with the weights, add the biases and apply the ReLU neuron function
+conv1 = convolve(x, W_conv1) + b_conv1
+conv1 = tf.nn.relu(conv1)
+
+# Apply max pooling, reducing the image size to 12x12 pixels
+conv1 = max_pool(conv1)
