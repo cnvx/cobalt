@@ -26,7 +26,10 @@ data_url = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
 image_size = 32
 image_size_cropped = 24
 
+# Colour channels
 number_of_channels = 3
+
+# Possible objects
 number_of_classes = 10
 
 number_of_files_train = 5
@@ -196,5 +199,23 @@ def process_image(image, training_data):
 
     return image
 
-# Put the images inside a TensorFlow graph
-processed_images = tf.map_fn(lambda image: process_image(image, training_data = True), x)
+# Process the training images
+x = tf.map_fn(lambda image: process_image(image, training_data = True), x)
+
+''' Functions for creating weights and biases '''
+
+def weight_variable(shape):
+    W = tf.truncated_normal(shape, stddev = 0.1)
+    return tf.Variable(W)
+
+def bias_variable(shape):
+    b = tf.constant(0.1, shape = shape)
+    return tf.Variable(b)
+
+''' Convolution and max pooling functions '''
+
+def convolve(x, W):
+    return tf.nn.conv2d(x, W, strides = [1, 1, 1, 1], padding = 'SAME')
+
+def max_pool(x):
+    return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'SAME')
