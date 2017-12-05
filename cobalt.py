@@ -226,8 +226,15 @@ W_conv1 = weight_variable([5, 5, 3, 64])
 b_conv1 = bias_variable([64])
 
 # Convolve the input with the weights, add the biases and apply the ReLU neuron function
-conv1 = convolve(x, W_conv1) + b_conv1
-conv1 = tf.nn.relu(conv1)
+conv1 = tf.nn.relu(convolve(x, W_conv1) + b_conv1)
 
 # Apply max pooling, reducing the image size to 12x12 pixels
-conv1 = max_pool(conv1)
+pool1 = max_pool(conv1)
+
+''' Second convolutional layer '''
+
+W_conv2 = weight_variable([5, 5, 64, 64])
+b_conv2 = bias_variable([64])
+
+conv2 = tf.nn.relu(convolve(pool1, W_conv2) + b_conv2)
+pool2 = max_pool(conv2)
