@@ -238,3 +238,29 @@ b_conv2 = bias_variable([64])
 
 conv2 = tf.nn.relu(convolve(pool1, W_conv2) + b_conv2)
 pool2 = max_pool(conv2)
+
+''' First fully connected layer '''
+
+# Flatten the tensor into 1 dimension
+pool2_flat = tf.reshape(pool2, [-1, 6 * 6 * 64])
+print(pool2_flat)
+
+# Prepare the network variables
+W_conn1 = weight_variable([6 * 6 * 64, 256])
+b_conn1 = bias_variable([256])
+
+conn1 = tf.nn.relu(tf.matmul(pool2_flat, W_conn1) + b_conn1)
+
+''' Second fully connected layer '''
+
+W_conn2 = weight_variable([256, 128])
+b_conn2 = bias_variable([128])
+
+conn2 = tf.nn.relu(tf.matmul(conn1, W_conn2) + b_conn2)
+
+''' Output layer '''
+
+W_output = weight_variable([128, 10])
+b_output = bias_variable([10])
+
+output = tf.matmul(conn2, W_output) + b_output
