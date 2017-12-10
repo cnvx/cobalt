@@ -204,13 +204,13 @@ x = tf.map_fn(lambda image: process_image(image, training_data = True), x)
 
 ''' Functions for creating weights and biases '''
 
-def weight_variable(shape):
+def weight_variable(shape, name):
     W = tf.truncated_normal(shape, stddev = 0.1)
-    return tf.Variable(W)
+    return tf.Variable(W, name)
 
-def bias_variable(shape):
+def bias_variable(shape, name):
     b = tf.constant(0.1, shape = shape)
-    return tf.Variable(b)
+    return tf.Variable(b, name)
 
 ''' Convolution and max pooling functions '''
 
@@ -222,8 +222,8 @@ def max_pool(x):
 
 ''' First convolutional layer '''
 
-W_conv1 = weight_variable([5, 5, 3, 64])
-b_conv1 = bias_variable([64])
+W_conv1 = weight_variable([5, 5, 3, 64], 'W_conv1')
+b_conv1 = bias_variable([64], 'b_conv1')
 
 # Convolve the input with the weights, add the biases and apply the ReLU neuron function
 conv1 = tf.nn.relu(convolve(x, W_conv1) + b_conv1)
@@ -233,8 +233,8 @@ pool1 = max_pool(conv1)
 
 ''' Second convolutional layer '''
 
-W_conv2 = weight_variable([5, 5, 64, 64])
-b_conv2 = bias_variable([64])
+W_conv2 = weight_variable([5, 5, 64, 64], 'W_conv2')
+b_conv2 = bias_variable([64], 'b_conv2')
 
 conv2 = tf.nn.relu(convolve(pool1, W_conv2) + b_conv2)
 pool2 = max_pool(conv2)
@@ -243,24 +243,23 @@ pool2 = max_pool(conv2)
 
 # Flatten the tensor into 1 dimension
 pool2_flat = tf.reshape(pool2, [-1, 6 * 6 * 64])
-print(pool2_flat)
 
 # Prepare the network variables
-W_conn1 = weight_variable([6 * 6 * 64, 256])
-b_conn1 = bias_variable([256])
+W_conn1 = weight_variable([6 * 6 * 64, 256], 'W_conn1')
+b_conn1 = bias_variable([256], 'b_conn1')
 
 conn1 = tf.nn.relu(tf.matmul(pool2_flat, W_conn1) + b_conn1)
 
 ''' Second fully connected layer '''
 
-W_conn2 = weight_variable([256, 128])
-b_conn2 = bias_variable([128])
+W_conn2 = weight_variable([256, 128], 'W_conn2')
+b_conn2 = bias_variable([128], 'b_conn2')
 
 conn2 = tf.nn.relu(tf.matmul(conn1, W_conn2) + b_conn2)
 
 ''' Output layer '''
 
-W_output = weight_variable([128, 10])
-b_output = bias_variable([10])
+W_output = weight_variable([128, 10], 'W_output')
+b_output = bias_variable([10], 'b_output')
 
 output = tf.matmul(conn2, W_output) + b_output
