@@ -262,4 +262,24 @@ conn2 = tf.nn.relu(tf.matmul(conn1, W_conn2) + b_conn2)
 W_output = weight_variable([128, 10], 'W_output')
 b_output = bias_variable([10], 'b_output')
 
+# Regression
 output = tf.matmul(conn2, W_output) + b_output
+
+''' Training and evalutation '''
+
+# Cost function
+with tf.name_scope('cost_function'):
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = y_actual, logits = output))
+    tf.summary.scalar('cost_function', cross_entropy)
+
+# Train step
+with tf.name_scope('train'):
+    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+
+# Accuracy
+with tf.name_scope('accuracy'):
+    with tf.name_scope('correct_prediction'):
+        correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(y_actual, 1))
+    with tf.name_scope('accuracy'):
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    tf.summary.scalar('accuracy', accuracy)
