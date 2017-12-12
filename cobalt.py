@@ -186,6 +186,7 @@ def process_single_image(image, is_training_data):
 
 def process_images(images, is_training_data):
     images = tf.map_fn(lambda image: process_single_image(image, is_training_data), images)
+    
     return images
 
 # Get random batch
@@ -198,7 +199,7 @@ def random_batch():
     # Select random images and labels
     x_batch = images_train[random, :, :, :]
     y_batch = labels_train[random, :]
-    
+        
     return x_batch, y_batch
 
 ''' Functions for creating weights and biases '''
@@ -311,15 +312,19 @@ saver = tf.train.Saver()
 
 # Load the data set
 download_data_set()
-images_train, classes_train, labels_train = load_training_data()
-images_test, classes_test, labels_test = load_test_data()
+images_train_raw, classes_train, labels_train = load_training_data()
+images_test_raw, classes_test, labels_test = load_test_data()
 
 # Process the images
+
+images_train = process_images(images_train_raw, True)
+images_test = process_images(images_test_raw, False)
+
 with tf.Session() as process_sess:
     print('Preparing training data')
-    images_train = process_images(images_train, True).eval()
+    images_train_raw = images_train_raw.eval()
     print('Preparing test data')
-    images_test = process_images(images_test, False).eval()
+    images_test_raw = images_test_raw.eval()
 
 ''' Train the network '''
 
@@ -327,6 +332,7 @@ with tf.Session() as process_sess:
 save_location = './data/cobalt.ckpt'
 log_dir = './log'
 
+# Get times to train
 try:
     times_to_train = int(sys.argv[1])
 except IndexError:
@@ -336,10 +342,10 @@ except IndexError:
 # Start the session
 with tf.Session() as sess:
     sess.run(init_op)
-
+    
     # Merge all summaries and write them to disk
     merged = tf.summary.merge_all()
-    train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
+    #train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
 
     # Run the training loop, show progress every 100th step
     for i in range(times_to_train):
@@ -351,7 +357,7 @@ with tf.Session() as sess:
             print('Training network, current accuracy: %g [%g/%g]' % (train_accuracy, i, times_to_train))
 
             # Write a summary
-            train_writer.add_summary(summary, i)
+            #train_writer.add_summary(summary, i)
         
         # Execute a training step
         summary, _ = sess.run([merged, train_step], feed_dict_train)
