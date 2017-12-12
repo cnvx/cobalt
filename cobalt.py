@@ -314,3 +314,9 @@ download_data_set()
 images_train, classes_train, labels_train = load_training_data()
 images_test, classes_test, labels_test = load_test_data()
 
+# Process the images
+with tf.Session() as process_sess:
+    print('Preparing training data')
+    images_train = process_images(images_train, True).eval()
+    print('Preparing test data')
+    images_test = process_images(images_test, False).eval()
