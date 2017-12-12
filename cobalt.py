@@ -164,22 +164,11 @@ def load_test_data():
     images, class_numbers = load_data(filename='test_batch')
     return images, class_numbers, one_hot_encoded(class_numbers = class_numbers, number_of_classes = number_of_classes)
 
-''' Placeholder varialbes for the neural network '''
-
-# Images used as input
-x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
-
-# Real lables associated with each image
-y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
-
-# Real class numbers
-y_actual_class_numbers = tf.argmax(y_actual, axis = 1)
-
 ''' Image processing functions '''
 
 # If the image is training data make random modifications, if not just crop it
-def process_image(image, training_data):
-    if training_data:
+def process_single_image(image, is_training_data):
+    if is_training_data:
         image = tf.random_crop(image, size = [image_size_cropped, image_size_cropped, number_of_channels])
         image = tf.image.random_flip_left_right(image)
         image = tf.image.random_hue(image, max_delta = 0.05)
@@ -194,6 +183,10 @@ def process_image(image, training_data):
         image = tf.image.resize_image_with_crop_or_pad(image, target_height = image_size_cropped, target_width = image_size_cropped)
 
     return image
+
+def process_images(images, is_training_data):
+    images = tf.map_fn(lambda image: process_single_image(image, is_training_data), images)
+    return images
 
 # Get random batch
 
@@ -225,6 +218,17 @@ def convolve(x, W):
 
 def max_pool(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'SAME')
+
+''' Placeholder varialbes for the neural network '''
+
+# Images used as input
+x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
+
+# Real lables associated with each image
+y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
+
+# Real class numbers
+y_actual_class_numbers = tf.argmax(y_actual, axis = 1)
 
 ''' Neural network layers '''
 
@@ -309,3 +313,4 @@ saver = tf.train.Saver()
 download_data_set()
 images_train, classes_train, labels_train = load_training_data()
 images_test, classes_test, labels_test = load_test_data()
+
