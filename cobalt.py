@@ -304,3 +304,6 @@ def random_batch():
 
 # Initialization op
 init_op = tf.global_variables_initializer()
+
+# Save and restore op
+saver = tf.train.Saver()
