@@ -327,7 +327,11 @@ with tf.Session() as process_sess:
 save_location = './data/cobalt.ckpt'
 log_dir = './log'
 
-times_to_train = int(sys.argv[1])
+try:
+    times_to_train = int(sys.argv[1])
+except IndexError:
+    print('Input times to train:')
+    times_to_train = int(input())
 
 # Start the session
 with tf.Session() as sess:
