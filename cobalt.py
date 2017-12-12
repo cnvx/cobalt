@@ -14,7 +14,7 @@ import tarfile
 import zipfile
 import pickle
 
-''' Get the CIFAR-10 data set '''
+''' Functions for getting the CIFAR-10 data set '''
 
 # Where to save the data set
 data_path ='./CIFAR-10/'
@@ -164,10 +164,6 @@ def load_test_data():
     images, class_numbers = load_data(filename='test_batch')
     return images, class_numbers, one_hot_encoded(class_numbers = class_numbers, number_of_classes = number_of_classes)
 
-download_data_set()
-images_train, classes_train, labels_train = load_training_data()
-images_test, classes_test, labels_test = load_test_data()
-
 ''' Placeholder varialbes for the neural network '''
 
 # Images used as input
@@ -179,7 +175,7 @@ y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 
 # Real class numbers
 y_actual_class_numbers = tf.argmax(y_actual, axis = 1)
 
-''' Image processing '''
+''' Image processing functions '''
 
 # If the image is training data make random modifications, if not just crop it
 def process_image(image, training_data):
@@ -199,8 +195,18 @@ def process_image(image, training_data):
 
     return image
 
-# Process the training images
-x = tf.map_fn(lambda image: process_image(image, training_data = True), x)
+# Get random batch
+
+batch_size = 64
+
+def random_batch():
+    random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
+
+    # Select random images and labels
+    x_batch = images_train[random, :, :, :]
+    y_batch = labels_train[random, :]
+    
+    return x_batch, y_batch
 
 ''' Functions for creating weights and biases '''
 
@@ -220,7 +226,9 @@ def convolve(x, W):
 def max_pool(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'SAME')
 
-''' First convolutional layer '''
+''' Neural network layers '''
+
+# First convolutional layer
 
 with tf.name_scope('first_convolutional_layer'):
     W_conv1 = weight_variable([5, 5, 3, 64], 'W_conv1')
@@ -232,7 +240,7 @@ with tf.name_scope('first_convolutional_layer'):
     # Apply max pooling, reducing the image size to 12x12 pixels
     pool1 = max_pool(conv1)
 
-''' Second convolutional layer '''
+# Second convolutional layer
 
 with tf.name_scope('second_convolutional_layer'):
     W_conv2 = weight_variable([5, 5, 64, 64], 'W_conv2')
@@ -241,7 +249,7 @@ with tf.name_scope('second_convolutional_layer'):
     conv2 = tf.nn.relu(convolve(pool1, W_conv2) + b_conv2)
     pool2 = max_pool(conv2)
 
-''' First fully connected layer '''
+# First fully connected layer
 
 with tf.name_scope('first_fully_connected_layer'):
     # Flatten the tensor into 1 dimension
@@ -253,7 +261,7 @@ with tf.name_scope('first_fully_connected_layer'):
 
     conn1 = tf.nn.relu(tf.matmul(pool2_flat, W_conn1) + b_conn1)
 
-''' Second fully connected layer '''
+# Second fully connected layer
 
 with tf.name_scope('second_fully_connected_layer'):
     W_conn2 = weight_variable([256, 128], 'W_conn2')
@@ -261,7 +269,7 @@ with tf.name_scope('second_fully_connected_layer'):
 
     conn2 = tf.nn.relu(tf.matmul(conn1, W_conn2) + b_conn2)
 
-''' Output layer '''
+# Output layer
 
 with tf.name_scope('output_layer'):
     W_output = weight_variable([128, 10], 'W_output')
@@ -270,7 +278,7 @@ with tf.name_scope('output_layer'):
     # Regression
     output = tf.matmul(conn2, W_output) + b_output
 
-''' Training and evalutation '''
+''' Training and evaluation functions '''
 
 # Cost function
 with tf.name_scope('cost_function'):
@@ -289,21 +297,15 @@ with tf.name_scope('accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('accuracy', accuracy)
 
-# Get random batch
-
-batch_size = 64
-
-def random_batch():
-    random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
-
-    # Select random images and labels
-    x_batch = images_train[random, :, :, :]
-    y_batch = labels_train[random, :]
-    
-    return x_batch, y_batch
-
 # Initialization op
 init_op = tf.global_variables_initializer()
 
 # Save and restore op
 saver = tf.train.Saver()
+
+''' Prepare the data '''
+
+# Load the data set
+download_data_set()
+images_train, classes_train, labels_train = load_training_data()
+images_test, classes_test, labels_test = load_test_data()
