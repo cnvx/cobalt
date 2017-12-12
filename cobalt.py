@@ -288,3 +288,19 @@ with tf.name_scope('accuracy'):
     with tf.name_scope('accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('accuracy', accuracy)
+
+# Get random batch
+
+batch_size = 64
+
+def random_batch():
+    random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
+
+    # Select random images and labels
+    x_batch = images_train[random, :, :, :]
+    y_batch = labels_train[random, :]
+    
+    return x_batch, y_batch
+
+# Initialization op
+init_op = tf.global_variables_initializer()
