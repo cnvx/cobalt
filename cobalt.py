@@ -320,3 +320,38 @@ with tf.Session() as process_sess:
     images_train = process_images(images_train, True).eval()
     print('Preparing test data')
     images_test = process_images(images_test, False).eval()
+
+''' Train the network '''
+
+# Save locations
+save_location = './data/cobalt.ckpt'
+log_dir = './log'
+
+times_to_train = int(sys.argv[1])
+
+# Start the session
+with tf.Session() as sess:
+    sess.run(init_op)
+
+    # Merge all summaries and write them to disk
+    merged = tf.summary.merge_all()
+    train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
+
+    # Run the training loop, show progress every 100th step
+    for i in range(times_to_train):
+        x_batch, y_actual_batch = random_batch()
+        feed_dict_train = {x: x_batch, y_actual: y_actual_batch}
+
+        if i % 10 == 0:
+            train_accuracy = accuracy.eval(feed_dict_train)
+            print('Training network, current accuracy: %g [%g/%g]' % (train_accuracy, i, times_to_train))
+
+            # Write a summary
+            train_writer.add_summary(summary, i)
+        
+        # Execute a training step
+        summary, _ = sess.run([merged, train_step], feed_dict_train)
+
+    # Get final accuracy
+    feed_dict_test = {x: images_test, y_actual: labels_test}
+    print('Final accuracy: %g' % accuracy.eval(feed_dict_test))
