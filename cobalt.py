@@ -9,7 +9,6 @@ from datetime import timedelta
 import math
 import os
 import sys
-import shutil
 import urllib.request
 import tarfile
 import zipfile
@@ -331,9 +330,6 @@ except IndexError:
     print('Input times to train:')
     times_to_train = int(input())
 
-# Clear the log directory
-shutil.rmtree(log_dir)
-    
 # Start the session
 with tf.Session() as sess:
     sess.run(init_op)
@@ -347,16 +343,17 @@ with tf.Session() as sess:
         x_batch, y_actual_batch = random_batch()
         feed_dict_train = {x: x_batch, y_actual: y_actual_batch}
         
-        # Execute a training step
-        summary, _ = sess.run([merged, train_step], feed_dict_train)
-        
         if i % 100 == 0:
             train_accuracy = accuracy.eval(feed_dict_train)
-            print('Training network, step %g of %g. Current accuracy: %g' % (i, times_to_train, train_accuracy))
+            print('Training network, step %g of %g. Current batch accuracy: %g' % (i, times_to_train, train_accuracy))
 
-            # Write a summary
-            train_writer.add_summary(summary, i)
+        # Execute a training step
+        summary, _ = sess.run([merged, train_step], feed_dict_train)
+            
+        # Write a summary
+        train_writer.add_summary(summary, i)
 
     # Get final accuracy
     feed_dict_test = {x: images_test, y_actual: labels_test}
+    print('Checking accuracy...')
     print('Final accuracy: %g' % accuracy.eval(feed_dict_test))
