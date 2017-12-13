@@ -185,6 +185,10 @@ def process_single_image(image, is_training_data):
     return image
 
 def process_images(images, is_training_data):
+    if is_training_data:
+        print('Preparing training data')
+    else:
+        print('Preparing verification data')
     images = tf.map_fn(lambda image: process_single_image(image, is_training_data), images)
     
     return images
@@ -321,9 +325,8 @@ images_train = process_images(images_train_raw, True)
 images_test = process_images(images_test_raw, False)
 
 with tf.Session() as process_sess:
-    print('Preparing training data')
+    
     images_train_raw = images_train_raw.eval()
-    print('Preparing test data')
     images_test_raw = images_test_raw.eval()
 
 ''' Train the network '''
