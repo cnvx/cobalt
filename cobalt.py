@@ -199,11 +199,11 @@ batch_size = 64
 
 def random_batch():
     random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
-
+    
     # Select random images and labels
-    x_batch = images_train[random, :, :, :]
+    x_batch = images_train.eval()[random, :, :, :]
     y_batch = labels_train[random, :]
-        
+    
     return x_batch, y_batch
 
 ''' Functions for creating weights and biases '''
@@ -227,7 +227,7 @@ def max_pool(x):
 ''' Placeholder varialbes for the neural network '''
 
 # Images used as input
-x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
+x = tf.placeholder(tf.float32, shape = [None, image_size_cropped, image_size_cropped, number_of_channels], name = 'x')
 
 # Real lables associated with each image
 y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
@@ -323,11 +323,6 @@ images_test_raw, classes_test, labels_test = load_test_data()
 
 images_train = process_images(images_train_raw, True)
 images_test = process_images(images_test_raw, False)
-
-with tf.Session() as process_sess:
-    
-    images_train_raw = images_train_raw.eval()
-    images_test_raw = images_test_raw.eval()
 
 ''' Train the network '''
 
