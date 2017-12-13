@@ -9,6 +9,7 @@ from datetime import timedelta
 import math
 import os
 import sys
+import shutil
 import urllib.request
 import tarfile
 import zipfile
@@ -185,12 +186,8 @@ def process_single_image(image, is_training_data):
     return image
 
 def process_images(images, is_training_data):
-    if is_training_data:
-        print('Preparing training data')
-    else:
-        print('Preparing verification data')
     images = tf.map_fn(lambda image: process_single_image(image, is_training_data), images)
-    
+
     return images
 
 # Get random batch
@@ -201,7 +198,7 @@ def random_batch():
     random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
     
     # Select random images and labels
-    x_batch = images_train.eval()[random, :, :, :]
+    x_batch = images_train[random, :, :, :]
     y_batch = labels_train[random, :]
     
     return x_batch, y_batch
@@ -227,7 +224,7 @@ def max_pool(x):
 ''' Placeholder varialbes for the neural network '''
 
 # Images used as input
-x = tf.placeholder(tf.float32, shape = [None, image_size_cropped, image_size_cropped, number_of_channels], name = 'x')
+x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
 
 # Real lables associated with each image
 y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
@@ -239,12 +236,15 @@ y_actual_class_numbers = tf.argmax(y_actual, axis = 1)
 
 # First convolutional layer
 
+with tf.name_scope('image_processing_layer'):
+    proc = process_images(x, True)
+
 with tf.name_scope('first_convolutional_layer'):
     W_conv1 = weight_variable([5, 5, 3, 64], 'W_conv1')
     b_conv1 = bias_variable([64], 'b_conv1')
 
     # Convolve the input with the weights, add the biases and apply the ReLU neuron function
-    conv1 = tf.nn.relu(convolve(x, W_conv1) + b_conv1)
+    conv1 = tf.nn.relu(convolve(proc, W_conv1) + b_conv1)
 
     # Apply max pooling, reducing the image size to 12x12 pixels
     pool1 = max_pool(conv1)
@@ -287,7 +287,7 @@ with tf.name_scope('output_layer'):
     # Regression
     output = tf.matmul(conn2, W_output) + b_output
 
-''' Training and evaluation functions '''
+''' Learning functions and ops '''
 
 # Cost function
 with tf.name_scope('cost_function'):
@@ -299,12 +299,12 @@ with tf.name_scope('train'):
     train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
 
 # Accuracy
-with tf.name_scope('accuracy'):
+with tf.name_scope('network_accuracy'):
     with tf.name_scope('correct_prediction'):
         correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(y_actual, 1))
     with tf.name_scope('accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    tf.summary.scalar('accuracy', accuracy)
+    tf.summary.scalar('network_accuracy', accuracy)
 
 # Initialization op
 init_op = tf.global_variables_initializer()
@@ -312,17 +312,11 @@ init_op = tf.global_variables_initializer()
 # Save and restore op
 saver = tf.train.Saver()
 
-''' Prepare the data '''
+''' Load the data '''
 
-# Load the data set
 download_data_set()
-images_train_raw, classes_train, labels_train = load_training_data()
-images_test_raw, classes_test, labels_test = load_test_data()
-
-# Process the images
-
-images_train = process_images(images_train_raw, True)
-images_test = process_images(images_test_raw, False)
+images_train, classes_train, labels_train = load_training_data()
+images_test, classes_test, labels_test = load_test_data()
 
 ''' Train the network '''
 
@@ -337,28 +331,31 @@ except IndexError:
     print('Input times to train:')
     times_to_train = int(input())
 
+# Clear the log directory
+shutil.rmtree(log_dir)
+    
 # Start the session
 with tf.Session() as sess:
     sess.run(init_op)
     
     # Merge all summaries and write them to disk
     merged = tf.summary.merge_all()
-    #train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
+    train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
 
     # Run the training loop, show progress every 100th step
     for i in range(times_to_train):
         x_batch, y_actual_batch = random_batch()
         feed_dict_train = {x: x_batch, y_actual: y_actual_batch}
-
-        if i % 10 == 0:
-            train_accuracy = accuracy.eval(feed_dict_train)
-            print('Training network, current accuracy: %g [%g/%g]' % (train_accuracy, i, times_to_train))
-
-            # Write a summary
-            #train_writer.add_summary(summary, i)
         
         # Execute a training step
         summary, _ = sess.run([merged, train_step], feed_dict_train)
+        
+        if i % 100 == 0:
+            train_accuracy = accuracy.eval(feed_dict_train)
+            print('Training network, step %g of %g. Current accuracy: %g' % (i, times_to_train, train_accuracy))
+
+            # Write a summary
+            train_writer.add_summary(summary, i)
 
     # Get final accuracy
     feed_dict_test = {x: images_test, y_actual: labels_test}
