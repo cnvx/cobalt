@@ -105,7 +105,8 @@ def download_data_set():
                                                   filename = file_path,
                                                   reporthook = print_progress)
 
-        print('\rDownload complete\nExtracting files...')
+        sys.stdout.write('\rDownload complete    \nExtracting files...')
+        sys.stdout.flush()
         
         # Extract
         if file_path.endswith(".zip"):
@@ -113,7 +114,7 @@ def download_data_set():
         elif file_path.endswith((".tar.gz", ".tgz")):
             tarfile.open(name=file_path, mode="r:gz").extractall(data_path)
 
-        print('Done')
+        print('\rFiles extracted    ')
 
     else:
         print('Data has already been downloaded and extracted')
@@ -186,12 +187,11 @@ def process_single_image(image, is_training_data):
 
 def process_images(images, is_training_data):
     images = tf.map_fn(lambda image: process_single_image(image, is_training_data), images)
-
     return images
 
 # Get random batch
 
-batch_size = 64
+batch_size = 128
 
 def random_batch():
     random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
@@ -220,7 +220,7 @@ def convolve(x, W):
 def max_pool(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'SAME')
 
-''' Placeholder varialbes for the neural network '''
+''' Variables and placeholders for the neural network '''
 
 # Images used as input
 x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
@@ -228,25 +228,30 @@ x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_
 # Real lables associated with each image
 y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
 
-# Real class numbers
-y_actual_class_numbers = tf.argmax(y_actual, axis = 1)
+# Enable or disable distortion in the image processing layer
+distort = tf.Variable(initial_value = False, trainable = False, name = 'distort')
 
 ''' Neural network layers '''
 
-# First convolutional layer
+# Image processing layer
 
 with tf.name_scope('image_processing_layer'):
-    proc = process_images(x, True)
+    proc = process_images(x, distort)
 
+# First convolutional layer
+    
 with tf.name_scope('first_convolutional_layer'):
     W_conv1 = weight_variable([5, 5, 3, 64], 'W_conv1')
     b_conv1 = bias_variable([64], 'b_conv1')
 
-    # Convolve the input with the weights, add the biases and apply the ReLU neuron function
-    conv1 = tf.nn.relu(convolve(proc, W_conv1) + b_conv1)
+    # Convolve the input with the weights and add the biases
+    conv1 = convolve(proc, W_conv1) + b_conv1
 
     # Apply max pooling, reducing the image size to 12x12 pixels
     pool1 = max_pool(conv1)
+
+    # Apply the ReLU neuron function
+    relu1 = tf.nn.relu(pool1)
 
 # Second convolutional layer
 
@@ -254,14 +259,15 @@ with tf.name_scope('second_convolutional_layer'):
     W_conv2 = weight_variable([5, 5, 64, 64], 'W_conv2')
     b_conv2 = bias_variable([64], 'b_conv2')
 
-    conv2 = tf.nn.relu(convolve(pool1, W_conv2) + b_conv2)
+    conv2 = convolve(relu1, W_conv2) + b_conv2
     pool2 = max_pool(conv2)
+    relu2 = tf.nn.relu(pool2)
 
 # First fully connected layer
 
 with tf.name_scope('first_fully_connected_layer'):
     # Flatten the tensor into 1 dimension
-    pool2_flat = tf.reshape(pool2, [-1, 6 * 6 * 64])
+    pool2_flat = tf.reshape(relu2, [-1, 6 * 6 * 64])
 
     # Prepare the network variables
     W_conn1 = weight_variable([6 * 6 * 64, 256], 'W_conn1')
@@ -327,7 +333,8 @@ log_dir = './log'
 try:
     times_to_train = int(sys.argv[1])
 except IndexError:
-    print('Input times to train:')
+    sys.stdout.write('Input times to train: ')
+    sys.stdout.flush()
     times_to_train = int(input())
 
 # Start the session
@@ -341,19 +348,20 @@ with tf.Session() as sess:
     # Run the training loop, show progress every 100th step
     for i in range(times_to_train):
         x_batch, y_actual_batch = random_batch()
-        feed_dict_train = {x: x_batch, y_actual: y_actual_batch}
+        feed_dict_train = {x: x_batch, y_actual: y_actual_batch, distort: True}
         
         if i % 100 == 0:
             train_accuracy = accuracy.eval(feed_dict_train)
-            print('Training network, step %g of %g. Current batch accuracy: %g' % (i, times_to_train, train_accuracy))
+            print('Training network (step %g/%g), current batch accuracy: %g' % (i, times_to_train, train_accuracy))
 
         # Execute a training step
         summary, _ = sess.run([merged, train_step], feed_dict_train)
-            
+
         # Write a summary
         train_writer.add_summary(summary, i)
 
     # Get final accuracy
-    feed_dict_test = {x: images_test, y_actual: labels_test}
-    print('Checking accuracy...')
-    print('Final accuracy: %g' % accuracy.eval(feed_dict_test))
+    feed_dict_test = {x: images_test, y_actual: labels_test, distort: False}
+    sys.stdout.write('Testing...')
+    sys.stdout.flush()
+    print('\rFinal accuracy: %g' % accuracy.eval(feed_dict_test))
