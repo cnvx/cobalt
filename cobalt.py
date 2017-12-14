@@ -13,6 +13,7 @@ import urllib.request
 import tarfile
 import zipfile
 import pickle
+import glob
 
 ''' Functions for getting the CIFAR-10 data set '''
 
@@ -292,7 +293,7 @@ with tf.name_scope('output_layer'):
     # Regression
     output = tf.matmul(conn2, W_output) + b_output
 
-''' Learning functions and ops '''
+''' Additional functions and ops '''
 
 # Cost function
 with tf.name_scope('cost_function'):
@@ -310,6 +311,17 @@ with tf.name_scope('network_accuracy'):
     with tf.name_scope('accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('network_accuracy', accuracy)
+
+# Ask how many times to train
+def get_times_to_train():
+    try:
+        times = int(sys.argv[1])
+    except IndexError:
+        sys.stdout.write('Input times to train: ')
+        sys.stdout.flush()
+        times = int(input())
+        
+    return times
 
 # Initialization op
 init_op = tf.global_variables_initializer()
@@ -329,39 +341,58 @@ images_test, classes_test, labels_test = load_test_data()
 save_location = './data/cobalt.ckpt'
 log_dir = './log'
 
-# Get times to train
-try:
-    times_to_train = int(sys.argv[1])
-except IndexError:
-    sys.stdout.write('Input times to train: ')
-    sys.stdout.flush()
-    times_to_train = int(input())
+# Check for existing network
+if glob.glob(save_location + '*'):
+    try:
+        if str(sys.argv[2]) == 'y':
+            times_to_train = get_times_to_train()
+        else:
+            times_to_train = 0;
+    except IndexError:
+        sys.stdout.write('Overwrite existing network? (y/n): ')
+        sys.stdout.flush()
+        if str(input()) == 'y':
+            times_to_train = get_times_to_train()
+        else:
+            times_to_train = 0;
+else:
+    times_to_train = get_times_to_train()
 
 # Start the session
 with tf.Session() as sess:
     sess.run(init_op)
-    
-    # Merge all summaries and write them to disk
-    merged = tf.summary.merge_all()
-    train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
 
-    # Run the training loop, show progress every 100th step
-    for i in range(times_to_train):
-        x_batch, y_actual_batch = random_batch()
-        feed_dict_train = {x: x_batch, y_actual: y_actual_batch, distort: True}
+    if times_to_train != 0:
+        # Merge all summaries and write them to disk
+        merged = tf.summary.merge_all()
+        train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
         
-        if i % 100 == 0:
-            train_accuracy = accuracy.eval(feed_dict_train)
-            print('Training network (step %g/%g), current batch accuracy: %g' % (i, times_to_train, train_accuracy))
+        # Run the training loop, show progress every 100th step
+        for i in range(times_to_train):
+            x_batch, y_actual_batch = random_batch()
+            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, distort: True}
+            
+            if i % 100 == 0:
+                train_accuracy = accuracy.eval(feed_dict_train)
+                print('Training network (step %g/%g), current batch accuracy: %g' % (i, times_to_train, train_accuracy))
+                
+            # Execute a training step
+            summary, _ = sess.run([merged, train_step], feed_dict_train)
+                
+            # Write a summary
+            train_writer.add_summary(summary, i)
 
-        # Execute a training step
-        summary, _ = sess.run([merged, train_step], feed_dict_train)
-
-        # Write a summary
-        train_writer.add_summary(summary, i)
-
+        # Save the network variables to disk
+        save_path = saver.save(sess, save_location)
+        print('Network saved to %s' % save_path)
+                               
+    else:
+        # Load the old network variables
+        saver.restore(sess, save_location)
+        print('Network loaded from %s' % save_location)
+            
     # Get final accuracy
     feed_dict_test = {x: images_test, y_actual: labels_test, distort: False}
-    sys.stdout.write('Testing...')
+    sys.stdout.write('Getting accuracy...')
     sys.stdout.flush()
-    print('\rFinal accuracy: %g' % accuracy.eval(feed_dict_test))
+    print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_test))
