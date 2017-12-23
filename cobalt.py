@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 
-import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
-from sklearn.metrics import confusion_matrix
-import time
-from datetime import timedelta
-import math
 import os
 import sys
 import urllib.request
@@ -232,6 +227,9 @@ y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 
 # Enable or disable distortion in the image processing layer
 distort = tf.Variable(initial_value = False, trainable = False, name = 'distort')
 
+# Probability of not dropping neuron outputs
+keep = tf.placeholder(tf.float32)
+
 ''' Neural network layers '''
 
 # Image processing layer
@@ -284,6 +282,11 @@ with tf.name_scope('second_fully_connected_layer'):
 
     conn2 = tf.nn.relu(tf.matmul(conn1, W_conn2) + b_conn2)
 
+# Dropout layer
+
+with tf.name_scope('dropout_layer'):
+    drop = tf.nn.dropout(conn2, keep)
+    
 # Output layer
 
 with tf.name_scope('output_layer'):
@@ -291,7 +294,7 @@ with tf.name_scope('output_layer'):
     b_output = bias_variable([10], 'b_output')
 
     # Regression
-    output = tf.matmul(conn2, W_output) + b_output
+    output = tf.matmul(drop, W_output) + b_output
 
 ''' Additional functions and ops '''
 
@@ -370,10 +373,11 @@ with tf.Session() as sess:
         # Run the training loop, show progress every 100th step
         for i in range(times_to_train):
             x_batch, y_actual_batch = random_batch()
-            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, distort: True}
+            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, distort: True, keep: 0.5}
+            feed_dict_accuracy = {x: x_batch, y_actual: y_actual_batch, distort: True, keep: 1}
             
             if i % 100 == 0:
-                train_accuracy = accuracy.eval(feed_dict_train)
+                train_accuracy = accuracy.eval(feed_dict_accuracy)
                 print('Training network (step %g/%g), current batch accuracy: %g' % (i, times_to_train, train_accuracy))
                 
             # Execute a training step
@@ -392,7 +396,7 @@ with tf.Session() as sess:
         print('Network loaded from %s' % save_location)
             
     # Get final accuracy
-    feed_dict_test = {x: images_test, y_actual: labels_test, distort: False}
+    feed_dict_test = {x: images_test, y_actual: labels_test, distort: False, keep: 1}
     sys.stdout.write('Getting accuracy...')
     sys.stdout.flush()
     print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_test))
