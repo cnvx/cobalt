@@ -221,9 +221,6 @@ x = tf.placeholder(tf.float32, shape = [None, image_size_cropped, image_size_cro
 # Real lables associated with each image
 y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
 
-# Enable or disable distortion in the image processing layer
-distort = tf.Variable(initial_value = False, trainable = False, name = 'distort')
-
 # Probability of not dropping neuron outputs
 keep = tf.placeholder(tf.float32)
 
@@ -355,8 +352,10 @@ images_test_raw, classes_test, labels_test = load_test_data()
 # Process the images
 with tf.Session() as proc_sess:
     if times_to_train != 0:
-        images_train = process_images(images_train_raw, True).eval()
-    images_test = process_images(images_test_raw, False).eval()
+        with tf.name_scope('training_image_processing'):
+            images_train = process_images(images_train_raw, True).eval()
+    with tf.name_scope('validation_image_processing'):
+        images_test = process_images(images_test_raw, False).eval()
         
 ''' Train the network '''
     
@@ -372,8 +371,8 @@ with tf.Session() as sess:
         # Run the training loop, show progress every 100th step
         for i in range(times_to_train):
             x_batch, y_actual_batch = random_batch()
-            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, distort: True, keep: 0.5}
-            feed_dict_accuracy = {x: x_batch, y_actual: y_actual_batch, distort: True, keep: 1}
+            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, keep: 0.5}
+            feed_dict_accuracy = {x: x_batch, y_actual: y_actual_batch, keep: 1}
             
             if i % 100 == 0:
                 train_accuracy = accuracy.eval(feed_dict_accuracy)
@@ -395,7 +394,7 @@ with tf.Session() as sess:
         print('Network loaded from %s' % save_location)
             
     # Get final accuracy
-    feed_dict_test = {x: images_test, y_actual: labels_test, distort: False, keep: 1}
+    feed_dict_test = {x: images_test, y_actual: labels_test, keep: 1}
     sys.stdout.write('Getting accuracy...')
     sys.stdout.flush()
     print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_test))
