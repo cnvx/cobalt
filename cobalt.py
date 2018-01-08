@@ -318,7 +318,7 @@ with tf.name_scope('network_accuracy'):
 # Ask how many times to train
 def get_times_to_train():
     try:
-        times = int(sys.argv[1])
+        times = int(sys.argv[2])
     except IndexError:
         sys.stdout.write('Input times to train: ')
         sys.stdout.flush()
@@ -347,7 +347,7 @@ log_dir = './log'
 # Check for existing network
 if glob.glob(save_location + '*'):
     try:
-        if str(sys.argv[2]) == 'y':
+        if str(sys.argv[1]) == 'y':
             times_to_train = get_times_to_train()
         else:
             times_to_train = 0;
