@@ -16,8 +16,8 @@ Windows:
 
 ### Examples
 
-`./cobalt.py`
-`./cobalt.py n`
+`./cobalt.py`  
+`./cobalt.py n`  
 `./cobalt.py y 50000`
 
 ### Visualizing
@@ -45,7 +45,7 @@ sudo pip3 install tensorflow numpy
 
 1. Get Python from [here](https://www.python.org/downloads/release/python-362/), make sure to tick *Add Python 3.x to PATH* during installation.
 2. Download and run [this file](https://bootstrap.pypa.io/get-pip.py) to install pip.
-3. `python -m pip install --user numpy scipy pillow tensorflow`
+3. `python -m pip install --user tensorflow numpy`
 
 ## Acknowledgements
 
