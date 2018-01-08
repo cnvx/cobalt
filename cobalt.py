@@ -34,9 +34,6 @@ images_per_file = 10000
 # Total number of images in the training set
 number_of_images_train = number_of_files_train * images_per_file
 
-# Length of an image when flattened to a 1-dim array.
-image_size_flat = image_size * image_size * number_of_channels
-
 # Get full file path, return directory if called with no filename
 def get_file_path(filename = ''):
     return os.path.join(data_path, 'cifar-10-batches-py/', filename)
@@ -187,7 +184,7 @@ def process_images(images, is_training_data):
 
 # Get random batch
 
-batch_size = 128
+batch_size = 512
 
 def random_batch():
     random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
@@ -219,7 +216,7 @@ def max_pool(x):
 ''' Variables and placeholders for the neural network '''
 
 # Images used as input
-x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
+x = tf.placeholder(tf.float32, shape = [None, image_size_cropped, image_size_cropped, number_of_channels], name = 'x')
 
 # Real lables associated with each image
 y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
@@ -232,11 +229,6 @@ keep = tf.placeholder(tf.float32)
 
 ''' Neural network layers '''
 
-# Image processing layer
-
-with tf.name_scope('image_processing_layer'):
-    proc = process_images(x, distort)
-
 # First convolutional layer
     
 with tf.name_scope('first_convolutional_layer'):
@@ -244,7 +236,7 @@ with tf.name_scope('first_convolutional_layer'):
     b_conv1 = bias_variable([64], 'b_conv1')
 
     # Convolve the input with the weights and add the biases
-    conv1 = convolve(proc, W_conv1) + b_conv1
+    conv1 = convolve(x, W_conv1) + b_conv1
 
     # Apply max pooling, reducing the image size to 12x12 pixels
     pool1 = max_pool(conv1)
@@ -332,14 +324,6 @@ init_op = tf.global_variables_initializer()
 # Save and restore op
 saver = tf.train.Saver()
 
-''' Load the data '''
-
-download_data_set()
-images_train, classes_train, labels_train = load_training_data()
-images_test, classes_test, labels_test = load_test_data()
-
-''' Train the network '''
-
 # Save locations
 save_location = './data/cobalt.ckpt'
 log_dir = './log'
@@ -361,6 +345,21 @@ if glob.glob(save_location + '*'):
 else:
     times_to_train = get_times_to_train()
 
+''' Prepare the data '''
+
+# Load the data
+download_data_set()
+images_train_raw, classes_train, labels_train = load_training_data()
+images_test_raw, classes_test, labels_test = load_test_data()
+
+# Process the images
+with tf.Session() as proc_sess:
+    if times_to_train != 0:
+        images_train = process_images(images_train_raw, True).eval()
+    images_test = process_images(images_test_raw, False).eval()
+        
+''' Train the network '''
+    
 # Start the session
 with tf.Session() as sess:
     sess.run(init_op)
