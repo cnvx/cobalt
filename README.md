@@ -4,6 +4,7 @@ Convolutional neural network for image based object classification.
 
 ## About
 
+Use a GPU and lots of memory for best results.  
 Training and validation data taken from the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).
 
 ### Usage
@@ -49,13 +50,13 @@ sudo pip3 install tensorflow numpy
 
 ## Acknowledgements
 
-I found Hvass-Labs and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials) very helpful (although most of it uses the simplified [Pretty Tensor API](https://github.com/google/prettytensor). In particular the image preprocessing code was copied almost word for word.
+I found Hvass-Labs and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials) very helpful (although most of it uses the simplified [Pretty Tensor API](https://github.com/google/prettytensor)). In particular the image preprocessing code was copied almost word for word.
 
 A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton for collecting the images used in and maintaining the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).
 
 ## Disclaimer
 
-This is **alpha** (and mostly broken) code!
+This is **alpha** code! I wouldn't use it for anything important.
 
 ## License
 
