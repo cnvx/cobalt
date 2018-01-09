@@ -325,6 +325,9 @@ saver = tf.train.Saver()
 save_location = './data/cobalt.ckpt'
 log_dir = './log'
 
+# Download the data set
+download_data_set()
+
 # Check for existing network
 if glob.glob(save_location + '*'):
     try:
@@ -345,7 +348,6 @@ else:
 ''' Prepare the data '''
 
 # Load the data
-download_data_set()
 images_train_raw, classes_train, labels_train = load_training_data()
 images_test_raw, classes_test, labels_test = load_test_data()
 
