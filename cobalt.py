@@ -213,6 +213,25 @@ def convolve(x, W):
 def max_pool(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'SAME')
 
+# Batch normalization as described in https://arxiv.org/pdf/1502.03167v3.pdf
+def batch_norm(x, depth, is_training):
+    mean_batch, variance_batch = tf.nn.moments(x, [0, 1, 2], name = 'batch_mean_variance_calculation')
+    moving_average = tf.train.ExponentialMovingAverage(decay = 0.5)
+    
+    def mean_variance_update():
+        moving_average_op = moving_average.apply([mean_batch, variance_batch])
+        with tf.control_dependencies([moving_average_op]):
+            return tf.identity(mean_batch), tf.identity(variance_batch)
+        
+    mean, variance = tf.cond(is_training, mean_variance_update, lambda: (moving_average.average(mean_batch),
+                                                                         moving_average.average(variance_batch)))
+    
+    # Also known as offset and scale
+    beta = tf.Variable(tf.constant(0.0, shape = [depth]), name = 'beta', trainable = True)
+    gamma = tf.Variable(tf.constant(1.0, shape=[depth]), name='gamma', trainable = True)
+    
+    return tf.nn.batch_normalization(x, mean, variance, beta, gamma, 1e-4)
+
 ''' Variables and placeholders for the neural network '''
 
 # Images used as input
@@ -223,6 +242,9 @@ y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 
 
 # Probability of not dropping neuron outputs
 keep = tf.placeholder(tf.float32)
+
+# Is the network training or not, used in batch normalization function
+is_training = tf.Variable(initial_value = False, trainable = False, name = 'is_training')
 
 ''' Neural network layers '''
 
@@ -235,8 +257,11 @@ with tf.name_scope('first_convolutional_layer'):
     # Convolve the input with the weights and add the biases
     conv1 = convolve(x, W_conv1) + b_conv1
 
+    # Apply batch normalization
+    batch1 = batch_norm(conv1, 64, is_training)
+    
     # Apply max pooling, reducing the image size to 12x12 pixels
-    pool1 = max_pool(conv1)
+    pool1 = max_pool(batch1)
 
     # Apply the ReLU neuron function
     relu1 = tf.nn.relu(pool1)
@@ -248,7 +273,8 @@ with tf.name_scope('second_convolutional_layer'):
     b_conv2 = bias_variable([64], 'b_conv2')
 
     conv2 = convolve(relu1, W_conv2) + b_conv2
-    pool2 = max_pool(conv2)
+    batch2 = batch_norm(conv2, 64, is_training)
+    pool2 = max_pool(batch2)
     relu2 = tf.nn.relu(pool2)
 
 # First fully connected layer
@@ -370,13 +396,13 @@ with tf.Session() as sess:
         merged = tf.summary.merge_all()
         train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
         
-        # Run the training loop, show progress every 100th step
+        # Run the training loop, show progress every 1000th step
         for i in range(times_to_train):
             x_batch, y_actual_batch = random_batch()
-            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, keep: 0.5}
-            feed_dict_accuracy = {x: x_batch, y_actual: y_actual_batch, keep: 1}
+            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, keep: 1, is_training: True}
+            feed_dict_accuracy = {x: x_batch, y_actual: y_actual_batch, keep: 1, is_training: False}
             
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 train_accuracy = accuracy.eval(feed_dict_accuracy)
                 print('Training network (step %g/%g), current batch accuracy: %g' % (i, times_to_train, train_accuracy))
                 
@@ -396,7 +422,7 @@ with tf.Session() as sess:
         print('Network loaded from %s' % save_location)
             
     # Get final accuracy
-    feed_dict_test = {x: images_test, y_actual: labels_test, keep: 1}
+    feed_dict_test = {x: images_test, y_actual: labels_test, keep: 1, is_training: False}
     sys.stdout.write('Getting accuracy...')
     sys.stdout.flush()
     print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_test))
