@@ -50,9 +50,13 @@ sudo pip3 install tensorflow numpy
 
 ## Acknowledgements
 
-I found Hvass-Labs and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials) very helpful (although most of it uses the simplified [Pretty Tensor API](https://github.com/google/prettytensor)). In particular the image preprocessing code was copied almost word for word.
+If you're interested in machine learning I recommend reading [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com) by Michael Nielsen.
 
-A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton for collecting the images used in and maintaining the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).
+[Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](https://arxiv.org/pdf/1502.03167v3.pdf) (Sergey Ioffe & Christian Szegedy, 2015).
+
+Hvass-Labs and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials), in particular his download and data augmentation code.
+
+A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton for creating and maintaining the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).
 
 ## Disclaimer
 
