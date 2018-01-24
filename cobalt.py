@@ -184,7 +184,7 @@ def process_images(images, is_training_data):
 
 # Get random batch
 
-batch_size = 512
+batch_size = 128
 
 def random_batch():
     random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
@@ -195,15 +195,13 @@ def random_batch():
     
     return x_batch, y_batch
 
-''' Functions for creating weights and biases '''
+''' Functions for creating weights and biases using Xavier initialization '''
 
 def weight_variable(shape, name):
-    W = tf.truncated_normal(shape, stddev = 0.1)
-    return tf.Variable(W, name)
+    return tf.get_variable(name, shape = shape, initializer=tf.contrib.layers.xavier_initializer())
 
 def bias_variable(shape, name):
-    b = tf.constant(0.1, shape = shape)
-    return tf.Variable(b, name)
+    return tf.get_variable(name, shape = shape, initializer=tf.contrib.layers.xavier_initializer())
 
 ''' Convolution and max pooling functions '''
 
@@ -392,17 +390,18 @@ with tf.Session() as sess:
     sess.run(init_op)
 
     if times_to_train != 0:
+        
         # Merge all summaries and write them to disk
         merged = tf.summary.merge_all()
         train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
         
-        # Run the training loop, show progress every 1000th step
+        # Run the training loop, show progress every 100th step
         for i in range(times_to_train):
             x_batch, y_actual_batch = random_batch()
             feed_dict_train = {x: x_batch, y_actual: y_actual_batch, keep: 1, is_training: True}
             feed_dict_accuracy = {x: x_batch, y_actual: y_actual_batch, keep: 1, is_training: False}
             
-            if i % 1000 == 0:
+            if i % 100 == 0:
                 train_accuracy = accuracy.eval(feed_dict_accuracy)
                 print('Training network (step %g/%g), current batch accuracy: %g' % (i, times_to_train, train_accuracy))
                 
