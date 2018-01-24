@@ -56,7 +56,8 @@ If you're interested in machine learning I recommend reading [Neural Networks an
 
 Hvass-Labs and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials), in particular his download and data augmentation code.
 
-A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton for creating and maintaining the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).
+A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton for creating and maintaining the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  
+[Learning Multiple Layers of Features from Tiny Images](https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf) (Alex Krizhevsky, 2009).
 
 ## Disclaimer
 
