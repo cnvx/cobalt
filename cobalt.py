@@ -13,7 +13,6 @@ import glob
 ''' Hyperparameters '''
 
 batch_size = 64
-weight_decay = 5e2
 
 # Enable data augmentation during training
 augment_data = False
@@ -209,6 +208,7 @@ def weight_variable(shape, name, decay):
 
     # Weight decay
     if decay:
+        weight_decay = 5e2
         for i in shape:
             weight_decay = weight_decay / i
             weight_loss = tf.multiply(tf.nn.l2_loss(variable), weight_decay, name = 'weight_loss')
@@ -259,76 +259,82 @@ keep = tf.placeholder(tf.float32)
 # Is the network training or not, used for batch normalization
 is_training = tf.Variable(initial_value = False, trainable = False, name = 'is_training')
 
-''' Neural network layers '''
+''' Neural network architecture '''
 
 # First convolutional layer
-    
-with tf.name_scope('first_convolutional_layer'):
-    W_conv1 = weight_variable([5, 5, 3, 64], 'W_conv1')
-    b_conv1 = bias_variable([64], 'b_conv1')
 
+with tf.name_scope('first_convolutional_layer'):
+    W_conv1 = weight_variable([5, 5, 3, 64], 'W_conv1', False)
+    b_conv1 = bias_variable([64], 'b_conv1')
+    
     # Convolve the input with the weights and add the biases
     conv1 = convolve(x, W_conv1) + b_conv1
-
-    # Apply batch normalization
-    batch1 = batch_norm(conv1, 64, is_training)
+    
+    # Apply the rectified linear unit function
+    relu1 = tf.nn.relu(conv1)
     
     # Apply max pooling, reducing the image size to 12x12 pixels
-    pool1 = max_pool(batch1)
-
-    # Apply the ReLU neuron function
-    relu1 = tf.nn.relu(pool1)
-
+    pool1 = max_pool(relu1)
+    
+    # Apply batch normalization
+    batch1 = batch_norm(pool1, 64, is_training)
+    
 # Second convolutional layer
 
 with tf.name_scope('second_convolutional_layer'):
-    W_conv2 = weight_variable([5, 5, 64, 64], 'W_conv2')
-    b_conv2 = bias_variable([64], 'b_conv2')
-
-    conv2 = convolve(relu1, W_conv2) + b_conv2
-    batch2 = batch_norm(conv2, 64, is_training)
+    W_conv2 = weight_variable([3, 3, 64, 96], 'W_conv2', False)
+    b_conv2 = bias_variable([96], 'b_conv2')
+    
+    conv2 = convolve(batch1, W_conv2) + b_conv2
+    relu2 = tf.nn.relu(conv2)
+    batch2 = batch_norm(relu2, 96, is_training)
     pool2 = max_pool(batch2)
-    relu2 = tf.nn.relu(pool2)
-
+    
 # First fully connected layer
-
+    
 with tf.name_scope('first_fully_connected_layer'):
     # Flatten the tensor into 1 dimension
-    pool2_flat = tf.reshape(relu2, [-1, 6 * 6 * 64])
-
+    pool2_flat = tf.reshape(pool2, [-1, 6 * 6 * 96])
+    
     # Prepare the network variables
-    W_conn1 = weight_variable([6 * 6 * 64, 256], 'W_conn1')
-    b_conn1 = bias_variable([256], 'b_conn1')
+    W_conn1 = weight_variable([6 * 6 * 96, 384], 'W_conn1', True)
+    b_conn1 = bias_variable([384], 'b_conn1')
+    
+    conn1 = tf.matmul(pool2_flat, W_conn1) + b_conn1
+    relu3 = tf.nn.relu(conn1)
+    
+# First dropout layer
 
-    conn1 = tf.nn.relu(tf.matmul(pool2_flat, W_conn1) + b_conn1)
-
+with tf.name_scope('first_dropout_layer'):
+    drop1 = tf.nn.dropout(relu3, keep)
+    
 # Second fully connected layer
 
 with tf.name_scope('second_fully_connected_layer'):
-    W_conn2 = weight_variable([256, 128], 'W_conn2')
-    b_conn2 = bias_variable([128], 'b_conn2')
+    W_conn2 = weight_variable([384, 192], 'W_conn2', True)
+    b_conn2 = bias_variable([192], 'b_conn2')
+    
+    conn2 = tf.matmul(drop1, W_conn2) + b_conn2
+    relu4 = tf.nn.relu(conn2)
+    
+# Second dropout layer
 
-    conn2 = tf.nn.relu(tf.matmul(conn1, W_conn2) + b_conn2)
-
-# Dropout layer
-
-with tf.name_scope('dropout_layer'):
-    drop = tf.nn.dropout(conn2, keep)
+with tf.name_scope('second_dropout_layer'):
+    drop2 = tf.nn.dropout(relu4, keep)
     
 # Output layer
 
-with tf.name_scope('output_layer'):
-    W_output = weight_variable([128, 10], 'W_output')
-    b_output = bias_variable([10], 'b_output')
-
-    # Regression
-    output = tf.matmul(drop, W_output) + b_output
-
+with tf.name_scope('third_fully_connected_layer'):
+    W_conn3 = weight_variable([192, 10], 'W_conn3', False)
+    b_conn3 = bias_variable([10], 'b_conn3')
+    
+    conn3 = tf.matmul(drop2, W_conn3) + b_conn3
+    
 ''' Additional functions and ops '''
 
 # Cost function
 with tf.name_scope('cost_function'):
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = y_actual, logits = output))
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = y_actual, logits = conn3))
     tf.summary.scalar('cost_function', cross_entropy)
 
 # Train step
@@ -338,7 +344,7 @@ with tf.name_scope('train'):
 # Accuracy
 with tf.name_scope('network_accuracy'):
     with tf.name_scope('correct_prediction'):
-        correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(y_actual, 1))
+        correct_prediction = tf.equal(tf.argmax(conn3, 1), tf.argmax(y_actual, 1))
     with tf.name_scope('accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('network_accuracy', accuracy)
