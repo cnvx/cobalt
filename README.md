@@ -50,7 +50,9 @@ sudo pip3 install tensorflow numpy
 
 ## Acknowledgements
 
-If you're interested in machine learning I recommend reading [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com) by Michael Nielsen.
+If you're interested in machine learning I recommend starting with [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com) by Michael Nielsen.
+
+[ImageNet Classification with Deep Convolutional Neural Networks](http://vision.stanford.edu/teaching/cs231b_spring1415/slides/alexnet_tugce_kyunghee.pdf) (Alex Krizhevsky, Ilya Sutskever & Geoffrey Hinton, 2015).
 
 [Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](https://arxiv.org/pdf/1502.03167v3.pdf) (Sergey Ioffe & Christian Szegedy, 2015).
 
