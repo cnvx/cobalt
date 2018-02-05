@@ -10,6 +10,14 @@ import zipfile
 import pickle
 import glob
 
+''' Hyperparameters '''
+
+batch_size = 64
+weight_decay = 5e2
+
+# Enable data augmentation during training
+augment_data = False
+
 ''' Functions for getting the CIFAR-10 data set '''
 
 # Where to save the data set
@@ -174,7 +182,8 @@ def process_single_image(image, is_training_data):
         image = tf.minimum(image, 1.0)
         image = tf.maximum(image, 0.0)
     else:
-        image = tf.image.resize_image_with_crop_or_pad(image, target_height = image_size_cropped, target_width = image_size_cropped)
+        image = tf.image.resize_image_with_crop_or_pad(image, target_height = image_size_cropped,
+                                                       target_width = image_size_cropped)
 
     return image
 
@@ -183,9 +192,6 @@ def process_images(images, is_training_data):
     return images
 
 # Get random batch
-
-batch_size = 128
-
 def random_batch():
     random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
     
@@ -195,13 +201,22 @@ def random_batch():
     
     return x_batch, y_batch
 
-''' Functions for creating weights and biases using Xavier initialization '''
+''' Functions for creating weights (using Xavier initialization) and biases '''
 
-def weight_variable(shape, name):
-    return tf.get_variable(name, shape = shape, initializer=tf.contrib.layers.xavier_initializer())
+def weight_variable(shape, name, decay):
+    xavier = tf.contrib.layers.xavier_initializer(uniform = False)
+    variable = tf.get_variable(name, shape = shape, initializer = xavier)
+
+    # Weight decay
+    if decay:
+        for i in shape:
+            weight_decay = weight_decay / i
+            weight_loss = tf.multiply(tf.nn.l2_loss(variable), weight_decay, name = 'weight_loss')
+
+    return variable
 
 def bias_variable(shape, name):
-    return tf.get_variable(name, shape = shape, initializer=tf.contrib.layers.xavier_initializer())
+    return tf.get_variable(name, shape = shape, initializer = tf.constant_initializer(0.0))
 
 ''' Convolution and max pooling functions '''
 
@@ -211,7 +226,7 @@ def convolve(x, W):
 def max_pool(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'SAME')
 
-# Batch normalization as described in https://arxiv.org/pdf/1502.03167v3.pdf
+# Batch normalization
 def batch_norm(x, depth, is_training):
     mean_batch, variance_batch = tf.nn.moments(x, [0, 1, 2], name = 'batch_mean_variance_calculation')
     moving_average = tf.train.ExponentialMovingAverage(decay = 0.5)
@@ -226,7 +241,7 @@ def batch_norm(x, depth, is_training):
     
     # Also known as offset and scale
     beta = tf.Variable(tf.constant(0.0, shape = [depth]), name = 'beta', trainable = True)
-    gamma = tf.Variable(tf.constant(1.0, shape=[depth]), name='gamma', trainable = True)
+    gamma = tf.Variable(tf.constant(1.0, shape = [depth]), name='gamma', trainable = True)
     
     return tf.nn.batch_normalization(x, mean, variance, beta, gamma, 1e-4)
 
@@ -241,7 +256,7 @@ y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 
 # Probability of not dropping neuron outputs
 keep = tf.placeholder(tf.float32)
 
-# Is the network training or not, used in batch normalization function
+# Is the network training or not, used for batch normalization
 is_training = tf.Variable(initial_value = False, trainable = False, name = 'is_training')
 
 ''' Neural network layers '''
@@ -379,7 +394,7 @@ images_test_raw, classes_test, labels_test = load_test_data()
 with tf.Session() as proc_sess:
     if times_to_train != 0:
         with tf.name_scope('training_image_processing'):
-            images_train = process_images(images_train_raw, True).eval()
+            images_train = process_images(images_train_raw, augment_data).eval()
     with tf.name_scope('validation_image_processing'):
         images_test = process_images(images_test_raw, False).eval()
         
