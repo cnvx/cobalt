@@ -13,6 +13,10 @@ import glob
 ''' Hyperparameters '''
 
 batch_size = 64
+initial_weight_decay = 5e2
+initial_learning_rate = 0.1
+learning_rate_decay = 0.96
+learning_decay_frequency = 10000
 
 # Enable data augmentation during training
 augment_data = False
@@ -36,10 +40,12 @@ number_of_channels = 3
 number_of_classes = 10
 
 number_of_files_train = 5
+number_of_files_test = 1
 images_per_file = 10000
 
-# Total number of images in the training set
+# Total number of images
 number_of_images_train = number_of_files_train * images_per_file
+number_of_images_test = number_of_files_test * images_per_file
 
 # Get full file path, return directory if called with no filename
 def get_file_path(filename = ''):
@@ -160,14 +166,14 @@ def load_training_data():
 
     return images, class_numbers, one_hot_encoded(class_numbers = class_numbers, number_of_classes = number_of_classes)
 
-# Load all the test data
+# Load all the validation data
 def load_test_data():
     images, class_numbers = load_data(filename='test_batch')
     return images, class_numbers, one_hot_encoded(class_numbers = class_numbers, number_of_classes = number_of_classes)
 
 ''' Image processing functions '''
 
-# If the image is training data make random modifications, if not just crop it
+# If data augmentation is enabled make random modifications, if not just crop it
 def process_single_image(image, is_training_data):
     if is_training_data:
         image = tf.random_crop(image, size = [image_size_cropped, image_size_cropped, number_of_channels])
@@ -190,39 +196,63 @@ def process_images(images, is_training_data):
     images = tf.map_fn(lambda image: process_single_image(image, is_training_data), images)
     return images
 
-# Get random batch
-def random_batch():
-    random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
-    
-    # Select random images and labels
-    x_batch = images_train[random, :, :, :]
-    y_batch = labels_train[random, :]
+# Get random batch of images and labels
+def random_batch(validation = False):
+    if validation:
+        random = np.random.choice(number_of_images_test, size = batch_size, replace = False)
+        x_batch = images_test[random, :, :, :]
+        y_batch = labels_test[random, :]
+    else:
+        random = np.random.choice(number_of_images_train, size = batch_size, replace = False)
+        x_batch = images_train[random, :, :, :]
+        y_batch = labels_train[random, :]
     
     return x_batch, y_batch
 
-''' Functions for creating weights (using Xavier initialization) and biases '''
+''' Variables and placeholders for the neural network '''
 
+# Images used as input
+x = tf.placeholder(tf.float32, shape = [None, image_size_cropped, image_size_cropped, number_of_channels], name = 'x')
+
+# Real lables associated with each image
+y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
+
+# Probability of not dropping neuron outputs
+keep = tf.placeholder(tf.float32)
+
+# Is the network training or not, used for batch normalization
+is_training = tf.Variable(initial_value = False, trainable = False, name = 'is_training')
+
+# Learning rate
+with tf.name_scope('learning_rate'):
+    learning_rate = tf.placeholder(tf.float32, shape=[])
+    tf.summary.scalar('learning_rate', learning_rate)
+
+''' Functions used in the neural network '''
+
+# Create weight variable using Xavier initialization
 def weight_variable(shape, name, decay):
     xavier = tf.contrib.layers.xavier_initializer(uniform = False)
     variable = tf.get_variable(name, shape = shape, initializer = xavier)
 
     # Weight decay
     if decay:
-        weight_decay = 5e2
+        weight_decay = initial_weight_decay
         for i in shape:
             weight_decay = weight_decay / i
             weight_loss = tf.multiply(tf.nn.l2_loss(variable), weight_decay, name = 'weight_loss')
 
     return variable
 
+# Create bias variable
 def bias_variable(shape, name):
     return tf.get_variable(name, shape = shape, initializer = tf.constant_initializer(0.0))
 
-''' Convolution and max pooling functions '''
-
+# Convolution
 def convolve(x, W):
     return tf.nn.conv2d(x, W, strides = [1, 1, 1, 1], padding = 'SAME')
 
+# Max pooling
 def max_pool(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'SAME')
 
@@ -244,20 +274,6 @@ def batch_norm(x, depth, is_training):
     gamma = tf.Variable(tf.constant(1.0, shape = [depth]), name='gamma', trainable = True)
     
     return tf.nn.batch_normalization(x, mean, variance, beta, gamma, 1e-4)
-
-''' Variables and placeholders for the neural network '''
-
-# Images used as input
-x = tf.placeholder(tf.float32, shape = [None, image_size_cropped, image_size_cropped, number_of_channels], name = 'x')
-
-# Real lables associated with each image
-y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
-
-# Probability of not dropping neuron outputs
-keep = tf.placeholder(tf.float32)
-
-# Is the network training or not, used for batch normalization
-is_training = tf.Variable(initial_value = False, trainable = False, name = 'is_training')
 
 ''' Neural network architecture '''
 
@@ -339,7 +355,7 @@ with tf.name_scope('cost_function'):
 
 # Train step
 with tf.name_scope('train'):
-    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
 
 # Accuracy
 with tf.name_scope('network_accuracy'):
@@ -347,7 +363,7 @@ with tf.name_scope('network_accuracy'):
         correct_prediction = tf.equal(tf.argmax(conn3, 1), tf.argmax(y_actual, 1))
     with tf.name_scope('accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    tf.summary.scalar('network_accuracy', accuracy)
+    tf.summary.scalar('training_accuracy', accuracy)
 
 # Ask how many times to train
 def get_times_to_train():
@@ -412,25 +428,40 @@ with tf.Session() as sess:
 
     if times_to_train != 0:
         
-        # Merge all summaries and write them to disk
+        # Merge all summaries
         merged = tf.summary.merge_all()
+
+        # Summary writers
         train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
+        validation_writer = tf.summary.FileWriter(log_dir + '/validation')
+
+        # Validation accuracy summary
+        accuracy_summary = tf.summary.scalar('validation_accuracy', accuracy)
         
-        # Run the training loop, show progress every 100th step
+        # Run the training loop, show progress every 1000th step
         for i in range(times_to_train):
-            x_batch, y_actual_batch = random_batch()
-            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, keep: 1, is_training: True}
-            feed_dict_accuracy = {x: x_batch, y_actual: y_actual_batch, keep: 1, is_training: False}
+
+            # Decay the learning rate
+            learn = initial_learning_rate * learning_rate_decay ** (i // learning_decay_frequency)
             
-            if i % 100 == 0:
-                train_accuracy = accuracy.eval(feed_dict_accuracy)
-                print('Training network (step %g/%g), current batch accuracy: %g' % (i, times_to_train, train_accuracy))
-                
-            # Execute a training step
+            x_batch, y_actual_batch = random_batch()
+            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, keep: 0.5, is_training: True, learning_rate: learn}
+
+            # Execute a training step`
             summary, _ = sess.run([merged, train_step], feed_dict_train)
-                
+
             # Write a summary
             train_writer.add_summary(summary, i)
+            
+            if i % 100 == 0:
+                x_test, y_actual_test = random_batch(True)
+                feed_dict_validation = {x: x_test, y_actual: y_actual_test, keep: 1, is_training: False}
+                
+                summary, validation_accuracy = sess.run([accuracy_summary, accuracy], feed_dict_validation)
+                validation_writer.add_summary(summary, i)
+                
+                if i % 1000 == 0:
+                    print('Training network (step %g/%g), current accuracy: %g' % (i, times_to_train, validation_accuracy))
 
         # Save the network variables to disk
         save_path = saver.save(sess, save_location)
@@ -442,7 +473,7 @@ with tf.Session() as sess:
         print('Network loaded from %s' % save_location)
             
     # Get final accuracy
-    feed_dict_test = {x: images_test, y_actual: labels_test, keep: 1, is_training: False}
+    feed_dict_final = {x: images_test, y_actual: labels_test, keep: 1, is_training: False}
     sys.stdout.write('Getting accuracy...')
     sys.stdout.flush()
-    print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_test))
+    print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_final))
