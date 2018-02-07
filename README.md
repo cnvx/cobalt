@@ -1,6 +1,6 @@
 # cobalt
 
-Convolutional neural network for image based object classification.
+Convolutional neural network for image-based object classification.
 
 ## About
 
@@ -10,16 +10,16 @@ Training and validation data taken from the [CIFAR-10 data set](https://www.cs.t
 ### Usage
 
 Linux (or anything that supports [shebangs](https://en.wikipedia.org/wiki/Shebang_(Unix))):  
-`./cobalt.py [overwrite_network(y/n)] [times_to_train]`
+`./cobalt.py --help`
 
 Windows:  
-`python cobalt.py [overwrite_network(y/n)] [times_to_train]`
+`python cobalt.py --help`
 
 ### Examples
 
-`./cobalt.py`  
-`./cobalt.py n`  
-`./cobalt.py y 50000`
+`./cobalt.py --train 20000`  
+`./cobalt.py --accuracy`  
+`./cobalt.py -t 50000 -a`
 
 ### Visualizing
 
