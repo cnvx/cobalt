@@ -19,9 +19,6 @@ initial_learning_rate = 0.1
 learning_rate_decay = 0.96
 learning_decay_frequency = 10000
 
-# Enable data augmentation during training
-augment_data = False
-
 ''' Argument parsing '''
 
 format = lambda prog: arg.HelpFormatter(prog, max_help_position=79)
