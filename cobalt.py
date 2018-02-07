@@ -9,6 +9,7 @@ import tarfile
 import zipfile
 import pickle
 import glob
+import argparse as arg
 
 ''' Hyperparameters '''
 
@@ -20,6 +21,26 @@ learning_decay_frequency = 10000
 
 # Enable data augmentation during training
 augment_data = False
+
+''' Argument parsing '''
+
+format = lambda prog: arg.HelpFormatter(prog, max_help_position=79)
+parser = arg.ArgumentParser(formatter_class = format)
+
+parser.add_argument('-t', '--train', dest = 'steps', type = int, default = 0,
+                    help = 'enter number of times to train')
+parser.add_argument('-a', '--accuracy', action = 'store_true', default = False,
+                    help = 'check network validation accuracy')
+parser.add_argument('-d', '--data_augmentation', action = 'store_true', default = False,
+                    help = 'enable data augmentation during training')
+parser.add_argument('-o', '--overwrite', action = 'store_true', default = False,
+                    help = 'overwrite saved network data')
+parser.add_argument('-s', '--save', metavar = 'directory', dest = 'save_dir', default = 'data',
+                    help = 'network save location')
+parser.add_argument('-l', '--log', metavar = 'directory', dest = 'log_dir', default = 'log',
+                    help = 'where to save the log files')
+
+args = parser.parse_args()
 
 ''' Functions for getting the CIFAR-10 data set '''
 
@@ -365,17 +386,6 @@ with tf.name_scope('network_accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('training_accuracy', accuracy)
 
-# Ask how many times to train
-def get_times_to_train():
-    try:
-        times = int(sys.argv[2])
-    except IndexError:
-        sys.stdout.write('Input times to train: ')
-        sys.stdout.flush()
-        times = int(input())
-        
-    return times
-
 # Initialization op
 init_op = tf.global_variables_initializer()
 
@@ -383,28 +393,11 @@ init_op = tf.global_variables_initializer()
 saver = tf.train.Saver()
 
 # Save locations
-save_location = './data/cobalt.ckpt'
-log_dir = './log'
+save_location = args.save_dir + '/cobalt.ckpt'
+log_directory = args.log_dir
 
 # Download the data set
 download_data_set()
-
-# Check for existing network
-if glob.glob(save_location + '*'):
-    try:
-        if str(sys.argv[1]) == 'y':
-            times_to_train = get_times_to_train()
-        else:
-            times_to_train = 0;
-    except IndexError:
-        sys.stdout.write('Overwrite existing network? (y/n): ')
-        sys.stdout.flush()
-        if str(input()) == 'y':
-            times_to_train = get_times_to_train()
-        else:
-            times_to_train = 0;
-else:
-    times_to_train = get_times_to_train()
 
 ''' Prepare the data '''
 
@@ -414,11 +407,12 @@ images_test_raw, classes_test, labels_test = load_test_data()
 
 # Process the images
 with tf.Session() as proc_sess:
-    if times_to_train != 0:
+    if args.steps != 0:
         with tf.name_scope('training_image_processing'):
-            images_train = process_images(images_train_raw, augment_data).eval()
-    with tf.name_scope('validation_image_processing'):
-        images_test = process_images(images_test_raw, False).eval()
+            images_train = process_images(images_train_raw, args.data_augmentation).eval()
+    if args.steps != 0 or args.accuracy:
+        with tf.name_scope('validation_image_processing'):
+            images_test = process_images(images_test_raw, False).eval()
         
 ''' Train the network '''
     
@@ -426,20 +420,20 @@ with tf.Session() as proc_sess:
 with tf.Session() as sess:
     sess.run(init_op)
 
-    if times_to_train != 0:
-        
+    if args.steps != 0 and (glob.glob(save_location + '*') == [] or args.overwrite):
+
         # Merge all summaries
         merged = tf.summary.merge_all()
 
         # Summary writers
-        train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
-        validation_writer = tf.summary.FileWriter(log_dir + '/validation')
+        train_writer = tf.summary.FileWriter(log_directory + '/train', sess.graph)
+        validation_writer = tf.summary.FileWriter(log_directory + '/validation')
 
         # Validation accuracy summary
         accuracy_summary = tf.summary.scalar('validation_accuracy', accuracy)
         
         # Run the training loop, show progress every 1000th step
-        for i in range(times_to_train):
+        for i in range(args.steps):
 
             # Decay the learning rate
             learn = initial_learning_rate * learning_rate_decay ** (i // learning_decay_frequency)
@@ -461,19 +455,26 @@ with tf.Session() as sess:
                 validation_writer.add_summary(summary, i)
                 
                 if i % 1000 == 0:
-                    print('Training network (step %g/%g), current accuracy: %g' % (i, times_to_train, validation_accuracy))
+                    print('Training network (step %g/%g), current accuracy: %g' % (i, args.steps, validation_accuracy))
 
         # Save the network variables to disk
-        save_path = saver.save(sess, save_location)
-        print('Network saved to %s' % save_path)
-                               
-    else:
+        saver.save(sess, save_location)
+        print('Network saved to %s' % save_location)
+
+    elif args.steps != 0:
+        print('Found saved network at %s, pick a new save location or use --overwrite' % save_location)
+        sess.close()
+        exit()
+        
+    if args.accuracy and glob.glob(save_location + '*') != []:
         # Load the old network variables
         saver.restore(sess, save_location)
         print('Network loaded from %s' % save_location)
             
-    # Get final accuracy
-    feed_dict_final = {x: images_test, y_actual: labels_test, keep: 1, is_training: False}
-    sys.stdout.write('Getting accuracy...')
-    sys.stdout.flush()
-    print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_final))
+        # Get final accuracy
+        feed_dict_final = {x: images_test, y_actual: labels_test, keep: 1, is_training: False}
+        sys.stdout.write('Getting accuracy...')
+        sys.stdout.flush()
+        print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_final))
+    elif args.accuracy:
+        print('Could not find saved network, unable to check accuracy')
