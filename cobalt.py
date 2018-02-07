@@ -463,9 +463,7 @@ with tf.Session() as sess:
 
     elif args.steps != 0:
         print('Found saved network at %s, pick a new save location or use --overwrite' % save_location)
-        sess.close()
-        exit()
-        
+                
     if args.accuracy and glob.glob(save_location + '*') != []:
         # Load the old network variables
         saver.restore(sess, save_location)
