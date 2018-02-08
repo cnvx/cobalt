@@ -4,8 +4,10 @@ Convolutional neural network for image-based object classification.
 
 ## About
 
-If you run out of memory try using a smaller batch size.  
+Based on the [AlexNet architecture](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf).  
 Training and validation data taken from the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).
+
+If you run out of memory try using a smaller batch size (128 by default).
 
 ### Usage
 
@@ -52,7 +54,7 @@ sudo pip3 install tensorflow numpy
 
 If you're interested in machine learning I recommend starting with [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com) by Michael Nielsen.
 
-[ImageNet Classification with Deep Convolutional Neural Networks](http://vision.stanford.edu/teaching/cs231b_spring1415/slides/alexnet_tugce_kyunghee.pdf) (Alex Krizhevsky, Ilya Sutskever & Geoffrey Hinton, 2015).
+[ImageNet Classification with Deep Convolutional Neural Networks](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf) (Alex Krizhevsky, Ilya Sutskever & Geoffrey E. Hinton, 2012).
 
 [Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](https://arxiv.org/pdf/1502.03167v3.pdf) (Sergey Ioffe & Christian Szegedy, 2015).
 
