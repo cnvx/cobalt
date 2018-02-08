@@ -19,7 +19,7 @@ Windows:
 
 `./cobalt.py --train 20000`  
 `./cobalt.py --accuracy`  
-`./cobalt.py -t 50000 -a --batch-size 32`
+`./cobalt.py -t 50000 -a --batch 32`
 
 ### Visualizing
 
