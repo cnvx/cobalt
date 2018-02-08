@@ -27,10 +27,8 @@ parser.add_argument('-t', '--train', metavar = 'steps', dest = 'times_to_train',
                     default = 0, help = 'enter number of times to train')
 parser.add_argument('-a', '--accuracy', action = 'store_true', default = False,
                     help = 'check network validation accuracy')
-parser.add_argument('-b', '--batch-size', metavar = 'size', dest = 'batch_size', type = int,
+parser.add_argument('-b', '--batch', metavar = 'size', dest = 'batch_size', type = int,
                     default = 128, help = 'batch size to use during training')
-parser.add_argument('-d', '--data-augmentation', action = 'store_true', default = False,
-                    help = 'enable data augmentation during training')
 parser.add_argument('-o', '--overwrite', action = 'store_true', default = False,
                     help = 'overwrite saved network data')
 parser.add_argument('-s', '--save', metavar = 'directory', dest = 'save_dir', default = 'data',
@@ -200,7 +198,7 @@ def process_single_image(image, is_training_data):
         image = tf.image.random_hue(image, max_delta = 0.05)
         image = tf.image.random_contrast(image, lower = 0.3, upper = 1.0)
         image = tf.image.random_saturation(image, lower = 0.0, upper = 2.0)
-        image = tf.image.random_brightness(image, max_delta = 2.0)
+        image = tf.image.random_brightness(image, max_delta = 0.2)
 
         # Stop tf.image.random_contrast() from outputting extreme values
         image = tf.minimum(image, 1.0)
@@ -231,16 +229,13 @@ def random_batch(validation = False):
 ''' Variables and placeholders for the neural network '''
 
 # Images used as input
-x = tf.placeholder(tf.float32, shape = [None, image_size_cropped, image_size_cropped, number_of_channels], name = 'x')
+x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
 
 # Real lables associated with each image
 y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
 
-# Probability of not dropping neuron outputs
-keep = tf.placeholder(tf.float32)
-
-# Is the network training or not, used for batch normalization
-is_training = tf.Variable(initial_value = False, trainable = False, name = 'is_training')
+# Is the network training or not
+is_training = tf.placeholder(tf.bool, name = 'is_training')
 
 # Learning rate
 with tf.name_scope('learning_rate'):
@@ -296,6 +291,11 @@ def batch_norm(x, depth, is_training):
 
 ''' Neural network architecture '''
 
+# Prepare the images
+
+with tf.name_scope('image_processing_layer'):
+    proc = tf.cond(is_training, lambda: process_images(x, True), lambda: process_images(x, False))
+
 # First convolutional layer
 
 with tf.name_scope('first_convolutional_layer'):
@@ -303,7 +303,7 @@ with tf.name_scope('first_convolutional_layer'):
     b_conv1 = bias_variable([64], 'b_conv1')
     
     # Convolve the input with the weights and add the biases
-    conv1 = convolve(x, W_conv1) + b_conv1
+    conv1 = convolve(proc, W_conv1) + b_conv1
     
     # Apply the rectified linear unit function
     relu1 = tf.nn.relu(conv1)
@@ -338,24 +338,14 @@ with tf.name_scope('first_fully_connected_layer'):
     conn1 = tf.matmul(pool2_flat, W_conn1) + b_conn1
     relu3 = tf.nn.relu(conn1)
     
-# First dropout layer
-
-with tf.name_scope('first_dropout_layer'):
-    drop1 = tf.nn.dropout(relu3, keep)
-    
 # Second fully connected layer
 
 with tf.name_scope('second_fully_connected_layer'):
     W_conn2 = weight_variable([384, 192], 'W_conn2', True)
     b_conn2 = bias_variable([192], 'b_conn2')
     
-    conn2 = tf.matmul(drop1, W_conn2) + b_conn2
+    conn2 = tf.matmul(relu3, W_conn2) + b_conn2
     relu4 = tf.nn.relu(conn2)
-    
-# Second dropout layer
-
-with tf.name_scope('second_dropout_layer'):
-    drop2 = tf.nn.dropout(relu4, keep)
     
 # Output layer
 
@@ -363,7 +353,7 @@ with tf.name_scope('third_fully_connected_layer'):
     W_conn3 = weight_variable([192, 10], 'W_conn3', False)
     b_conn3 = bias_variable([10], 'b_conn3')
     
-    conn3 = tf.matmul(drop2, W_conn3) + b_conn3
+    conn3 = tf.matmul(relu4, W_conn3) + b_conn3
     
 ''' Additional functions and ops '''
 
@@ -394,32 +384,22 @@ saver = tf.train.Saver()
 save_location = os.path.join(args.save_dir, 'cobalt.ckpt')
 log_directory = args.log_dir
 
+''' Prepare the data '''
+
 # Download the data set
 download_data_set()
 
-''' Prepare the data '''
-
 # Load the data
-images_train_raw, classes_train, labels_train = load_training_data()
-images_test_raw, classes_test, labels_test = load_test_data()
-
-# Process the images
-with tf.Session() as proc_sess:
-    if args.times_to_train != 0:
-        with tf.name_scope('training_image_processing'):
-            images_train = process_images(images_train_raw, args.data_augmentation).eval()
-    if args.times_to_train != 0 or args.accuracy:
-        with tf.name_scope('validation_image_processing'):
-            images_test = process_images(images_test_raw, False).eval()
+images_train, classes_train, labels_train = load_training_data()
+images_test, classes_test, labels_test = load_test_data()
         
 ''' Train the network '''
-    
+
 # Start the session
 with tf.Session() as sess:
     sess.run(init_op)
 
     if args.times_to_train != 0 and (glob.glob(save_location + '*') == [] or args.overwrite):
-
         # Merge all summaries
         merged = tf.summary.merge_all()
 
@@ -432,12 +412,11 @@ with tf.Session() as sess:
         
         # Run the training loop, show progress every 1000th step
         for i in range(args.times_to_train):
-
             # Decay the learning rate
             learn = initial_learning_rate * learning_rate_decay ** (i // learning_decay_frequency)
             
-            x_batch, y_actual_batch = random_batch()
-            feed_dict_train = {x: x_batch, y_actual: y_actual_batch, keep: 0.5, is_training: True, learning_rate: learn}
+            x_train, y_actual_train = random_batch()
+            feed_dict_train = {x: x_train, y_actual: y_actual_train, is_training: True, learning_rate: learn}
 
             # Execute a training step
             summary, _ = sess.run([merged, train_step], feed_dict_train)
@@ -447,11 +426,11 @@ with tf.Session() as sess:
             
             if i % 100 == 0:
                 x_test, y_actual_test = random_batch(True)
-                feed_dict_validation = {x: x_test, y_actual: y_actual_test, keep: 1, is_training: False}
-                
+                feed_dict_validation = {x: x_test, y_actual: y_actual_test, is_training: False}
+
                 summary, validation_accuracy = sess.run([accuracy_summary, accuracy], feed_dict_validation)
                 validation_writer.add_summary(summary, i)
-                
+
                 if i % 1000 == 0:
                     print('Training network (step %g/%g), current accuracy: %g' % (i, args.times_to_train, validation_accuracy))
 
@@ -468,7 +447,7 @@ with tf.Session() as sess:
         print('Network loaded from %s' % save_location)
             
         # Get final accuracy
-        feed_dict_final = {x: images_test, y_actual: labels_test, keep: 1, is_training: False}
+        feed_dict_final = {x: images_test, y_actual: labels_test, is_training: False}
         sys.stdout.write('Getting accuracy...')
         sys.stdout.flush()
         print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_final))
