@@ -359,7 +359,7 @@ with tf.name_scope('third_fully_connected_layer'):
 
 # Cost function
 with tf.name_scope('cost_function'):
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = y_actual, logits = conn3))
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels = y_actual, logits = conn3))
     tf.summary.scalar('cost_function', cross_entropy)
 
 # Train step
@@ -432,24 +432,27 @@ with tf.Session() as sess:
                 validation_writer.add_summary(summary, i)
 
                 if i % 1000 == 0:
-                    print('Training network (step %g/%g), current accuracy: %g' % (i, args.times_to_train, validation_accuracy))
+                    print('Training network (step {}/{}), current accuracy: {}%'.format(i, args.times_to_train,
+                                                                                        round(validation_accuracy * 100, 2)))
 
         # Save the network variables to disk
         saver.save(sess, save_location)
-        print('Network saved to %s' % save_location)
+        print('Network saved to {}'.format(save_location))
 
     elif args.times_to_train != 0:
-        print('Found saved network at %s, pick a new save location or use --overwrite' % save_location)
+        print('Found saved network at {}, pick a new save location or use --overwrite'.format(save_location))
                 
     if args.accuracy and glob.glob(save_location + '*') != []:
         # Load the old network variables
         saver.restore(sess, save_location)
-        print('Network loaded from %s' % save_location)
+        print('Network loaded from {}'.format(save_location))
             
         # Get final accuracy
         feed_dict_final = {x: images_test, y_actual: labels_test, is_training: False}
         sys.stdout.write('Getting accuracy...')
         sys.stdout.flush()
-        print('\rNetwork accuracy: %g' % accuracy.eval(feed_dict_final))
+        print('\rNetwork accuracy: {}%'.format(round(accuracy.eval(feed_dict_final) * 100, 2)))
     elif args.accuracy:
         print('Could not find saved network, unable to check accuracy')
+
+        
