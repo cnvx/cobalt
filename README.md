@@ -7,7 +7,7 @@ Convolutional neural network for image-based object classification.
 Based on the [AlexNet architecture](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf).  
 Training and validation data taken from the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).
 
-If you run out of memory try using a smaller batch size (128 by default).
+If you run out of memory try using a smaller batch size (256 by default).
 
 ### Usage
 
@@ -21,7 +21,7 @@ Windows:
 
 `./cobalt.py --train 20000`  
 `./cobalt.py --accuracy`  
-`./cobalt.py -t 50000 -a --batch 32`
+`./cobalt.py -t 50000 -a --batch 64`
 
 ### Visualizing
 

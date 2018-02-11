@@ -24,17 +24,17 @@ format = lambda prog: arg.HelpFormatter(prog, max_help_position=79)
 parser = arg.ArgumentParser(formatter_class = format)
 
 parser.add_argument('-t', '--train', metavar = 'steps', dest = 'times_to_train', type = int,
-                    default = 0, help = 'enter number of times to train')
+                    default = 0, help = 'how many times to train')
 parser.add_argument('-a', '--accuracy', action = 'store_true', default = False,
                     help = 'check network validation accuracy')
-parser.add_argument('-b', '--batch', metavar = 'size', dest = 'batch_size', type = int,
-                    default = 128, help = 'batch size to use during training')
 parser.add_argument('-o', '--overwrite', action = 'store_true', default = False,
                     help = 'overwrite saved network data')
+parser.add_argument('-b', '--batch', metavar = 'size', dest = 'batch_size', type = int,
+                    default = 256, help = 'batch size used during training')
 parser.add_argument('-s', '--save', metavar = 'directory', dest = 'save_dir', default = 'data',
-                    help = 'network save location')
+                    help = 'trained network save location')
 parser.add_argument('-l', '--log', metavar = 'directory', dest = 'log_dir', default = 'log',
-                    help = 'where to save the log files')
+                    help = 'where to save log files')
 
 args = parser.parse_args()
 
@@ -294,7 +294,8 @@ def batch_norm(x, depth, is_training):
 # Prepare the images
 
 with tf.name_scope('image_processing_layer'):
-    proc = tf.cond(is_training, lambda: process_images(x, True), lambda: process_images(x, False))
+    with tf.device('/cpu:0'):
+        proc = tf.cond(is_training, lambda: process_images(x, True), lambda: process_images(x, False))
 
 # First convolutional layer
 
@@ -454,5 +455,3 @@ with tf.Session() as sess:
         print('\rNetwork accuracy: {}%'.format(round(accuracy.eval(feed_dict_final) * 100, 2)))
     elif args.accuracy:
         print('Could not find saved network, unable to check accuracy')
-
-        
