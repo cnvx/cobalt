@@ -4,8 +4,8 @@ Convolutional neural network for image-based object classification.
 
 ## About
 
-Based on the [AlexNet architecture](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf).  
-Training and validation data taken from the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).
+Based on the [AlexNet architecture](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf), training and validation data taken from the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  
+Capable of reaching about 84% accuracy after 175000 training steps.
 
 If you run out of memory try using a smaller batch size (256 by default).
 
@@ -70,3 +70,6 @@ This is **alpha** code! I wouldn't use it for anything important.
 ## License
 
 The [MIT License](LICENSE).
+
+Data set download and augmentation functions belong to [Magnus Pedersen](https://github.com/Hvass-Labs/TensorFlow-Tutorials/blob/master/LICENSE).  
+TensorFlow is released under the [Apache License, Version 2.0](https://github.com/tensorflow/tensorflow/blob/master/LICENSE).
