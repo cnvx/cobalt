@@ -35,6 +35,8 @@ parser.add_argument('-s', '--save', metavar = 'directory', dest = 'save_dir', de
                     help = 'trained network save location')
 parser.add_argument('-l', '--log', metavar = 'directory', dest = 'log_dir', default = 'log',
                     help = 'where to save log files')
+parser.add_argument('-e', '--export', metavar = 'name', dest = 'export',
+                    help = 'export language-neutral network')
 
 args = parser.parse_args()
 
@@ -151,7 +153,7 @@ def load_class_names():
 
     return converted
 
-# Return a one hot encoded (helps reduce errors) 2 dimensional array of class numbers and labels
+# Return a one hot encoded 2 dimensional array of class numbers and labels
 def one_hot_encoded(class_numbers, number_of_classes = None):
     if number_of_classes is None:
         number_of_classes = np.max(class_numbers + 1)
@@ -354,7 +356,7 @@ with tf.name_scope('third_fully_connected_layer'):
     W_conn3 = weight_variable([192, 10], 'W_conn3', False)
     b_conn3 = bias_variable([10], 'b_conn3')
     
-    conn3 = tf.matmul(relu4, W_conn3) + b_conn3
+    conn3 = tf.add(tf.matmul(relu4, W_conn3), b_conn3, 'output')
     
 ''' Additional functions and ops '''
 
@@ -429,6 +431,7 @@ with tf.Session() as sess:
                 x_test, y_actual_test = random_batch(True)
                 feed_dict_validation = {x: x_test, y_actual: y_actual_test, is_training: False}
 
+                # Get the current validation accuracy
                 summary, validation_accuracy = sess.run([accuracy_summary, accuracy], feed_dict_validation)
                 validation_writer.add_summary(summary, i)
 
@@ -455,3 +458,41 @@ with tf.Session() as sess:
         print('\rNetwork accuracy: {}%'.format(round(accuracy.eval(feed_dict_final) * 100, 2)))
     elif args.accuracy:
         print('Could not find saved network, unable to check accuracy')
+
+''' Export network for inference, using protocol buffers '''
+
+if args.export is not None:
+    export_file = args.export + '.pb'
+
+    with tf.Session(graph = tf.Graph()) as export_sess:
+
+        # Load the saved network
+        meta_saver = tf.train.import_meta_graph(save_location + '.meta', clear_devices = True)
+        meta_saver.restore(export_sess, save_location)
+
+        graph_data = export_sess.graph.as_graph_def()
+
+        # Fix bug related to batch normalization
+        for node in graph_data.node:
+            if node.op == 'RefSwitch':
+                node.op = 'Switch'
+                for index in range(len(node.input)):
+                    if 'moving_' in node.input[index]:
+                        node.input[index] = node.input[index] + '/read'
+            elif node.op == 'AssignSub':
+                node.op = 'Sub'
+                if 'use_locking' in node.attr:
+                    del node.attr['use_locking']
+            elif node.op == 'AssignAdd':
+                node.op = 'Add'
+                if 'use_locking' in node.attr:
+                    del node.attr['use_locking']
+        
+        network = tf.graph_util.convert_variables_to_constants(export_sess, graph_data,
+                                                               ['third_fully_connected_layer/output'])
+
+        # Export the network using protocol buffers
+        with tf.gfile.GFile(export_file, 'wb') as exporter:
+            exporter.write(network.SerializeToString())
+
+        print('Neural network for inference exported to {}'.format(export_file))
