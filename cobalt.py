@@ -462,7 +462,11 @@ with tf.Session() as sess:
 ''' Export network for inference, using protocol buffers '''
 
 if args.export is not None:
-    export_file = args.export + '.pb'
+
+    # Set filename extension
+    export_file = args.export
+    if export_file.endswith('.pb') == False:
+        export_file = export_file + '.pb'
 
     with tf.Session(graph = tf.Graph()) as export_sess:
 
