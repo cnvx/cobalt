@@ -230,14 +230,17 @@ def random_batch(validation = False):
 
 ''' Variables and placeholders for the neural network '''
 
-# Images used as input
-x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
+# Input images for the neural network
+x = tf.placeholder(tf.float32, shape = [None, image_size_cropped, image_size_cropped, number_of_channels], name = 'x')
 
 # Real lables associated with each image
 y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
 
+# Images used as input during data augmentation
+raw = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'raw')
+
 # Is the network training or not
-is_training = tf.placeholder(tf.bool, name = 'is_training')
+is_training = tf.placeholder_with_default(False, shape = (), name = 'is_training')
 
 # Learning rate
 with tf.name_scope('learning_rate'):
@@ -297,7 +300,7 @@ def batch_norm(x, depth, is_training):
 
 with tf.name_scope('image_processing_layer'):
     with tf.device('/cpu:0'):
-        proc = tf.cond(is_training, lambda: process_images(x, True), lambda: process_images(x, False))
+        proc = tf.cond(is_training, lambda: process_images(raw, True), lambda: process_images(raw, False))
 
 # First convolutional layer
 
@@ -306,7 +309,7 @@ with tf.name_scope('first_convolutional_layer'):
     b_conv1 = bias_variable([64], 'b_conv1')
     
     # Convolve the input with the weights and add the biases
-    conv1 = convolve(proc, W_conv1) + b_conv1
+    conv1 = convolve(x, W_conv1) + b_conv1
     
     # Apply the rectified linear unit function
     relu1 = tf.nn.relu(conv1)
@@ -417,10 +420,13 @@ with tf.Session() as sess:
         for i in range(args.times_to_train):
             # Decay the learning rate
             learn = initial_learning_rate * learning_rate_decay ** (i // learning_decay_frequency)
-            
-            x_train, y_actual_train = random_batch()
-            feed_dict_train = {x: x_train, y_actual: y_actual_train, is_training: True, learning_rate: learn}
 
+            # Perform data augmentation
+            x_train, y_actual_train = random_batch()
+            augmented = sess.run(proc, {raw: x_train, is_training: True})
+            
+            feed_dict_train = {x: augmented, y_actual: y_actual_train, is_training: True, learning_rate: learn}
+            
             # Execute a training step
             summary, _ = sess.run([merged, train_step], feed_dict_train)
 
@@ -429,7 +435,8 @@ with tf.Session() as sess:
             
             if i % 100 == 0:
                 x_test, y_actual_test = random_batch(True)
-                feed_dict_validation = {x: x_test, y_actual: y_actual_test, is_training: False}
+                resized = sess.run(proc, {raw: x_test})
+                feed_dict_validation = {x: resized, y_actual: y_actual_test, is_training: False}
 
                 # Get the current validation accuracy
                 summary, validation_accuracy = sess.run([accuracy_summary, accuracy], feed_dict_validation)
@@ -452,7 +459,8 @@ with tf.Session() as sess:
         print('Network loaded from {}'.format(save_location))
             
         # Get final accuracy
-        feed_dict_final = {x: images_test, y_actual: labels_test, is_training: False}
+        cropped = sess.run(proc, {raw: images_test})
+        feed_dict_final = {x: cropped, y_actual: labels_test}
         sys.stdout.write('Getting accuracy...')
         sys.stdout.flush()
         print('\rNetwork accuracy: {}%'.format(round(accuracy.eval(feed_dict_final) * 100, 2)))
