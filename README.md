@@ -28,7 +28,7 @@ Windows:
 To represent training graphically:
 
 1. Navigate to the cobalt directory.
-2. Run `tensorboard --logdir=log` or `python -m tensorboard.main --logdir=log` on Windows.
+2. Run `tensorboard --logdir=data/log` or `python -m tensorboard.main --logdir=data/log` on Windows (replace `data` with whatever you set using `--save`).
 3. Open [localhost:6006](http://localhost:6006/) in your browser.
 
 ## Requirements

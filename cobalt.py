@@ -9,6 +9,7 @@ import tarfile
 import zipfile
 import pickle
 import glob
+import shutil
 import argparse as arg
 
 ''' Hyperparameters '''
@@ -32,9 +33,7 @@ parser.add_argument('-o', '--overwrite', action = 'store_true', default = False,
 parser.add_argument('-b', '--batch', metavar = 'size', dest = 'batch_size', type = int,
                     default = 256, help = 'batch size used during training')
 parser.add_argument('-s', '--save', metavar = 'directory', dest = 'save_dir', default = 'data',
-                    help = 'trained network save location')
-parser.add_argument('-l', '--log', metavar = 'directory', dest = 'log_dir', default = 'log',
-                    help = 'where to save log files')
+                    help = 'logs and trained network save location')
 parser.add_argument('-e', '--export', metavar = 'name', dest = 'export',
                     help = 'export language-neutral network')
 
@@ -388,7 +387,7 @@ saver = tf.train.Saver()
 
 # Save locations
 save_location = os.path.join(args.save_dir, 'cobalt.ckpt')
-log_directory = args.log_dir
+log_directory = os.path.join(args.save_dir, 'log')
 
 ''' Prepare the data '''
 
@@ -406,6 +405,10 @@ with tf.Session() as sess:
     sess.run(init_op)
 
     if args.times_to_train != 0 and (glob.glob(save_location + '*') == [] or args.overwrite):
+        # Delete the old logs if they exist
+        if glob.glob(log_directory):
+            shutil.rmtree(log_directory, ignore_errors = True)
+
         # Merge all summaries
         merged = tf.summary.merge_all()
 
