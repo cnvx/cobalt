@@ -31,9 +31,9 @@ To represent training graphically:
 2. Run `tensorboard --logdir=data/log` or `python -m tensorboard.main --logdir=data/log` on Windows (replace `data` with whatever you set using `--save`).
 3. Open [localhost:6006](http://localhost:6006/) in your browser.
 
-## Requirements
+### Requirements
 
-### Linux
+#### Linux
 
 If you're running something Debian based:
 
@@ -44,11 +44,27 @@ sudo pip3 install -U setuptools
 sudo pip3 install tensorflow numpy
 ```
 
-### Windows
+#### Windows
 
 1. Get Python from [here](https://www.python.org/downloads/release/python-362/), make sure to tick *Add Python 3.x to PATH* during installation.
 2. Download and run [this file](https://bootstrap.pypa.io/get-pip.py) to install pip.
 3. `python -m pip install --user tensorflow numpy`
+
+## Deploy
+
+To use this with your own code, save the trained network as a [.pb file](https://developers.google.com/protocol-buffers/) with `--export`.
+
+### Android
+
+If you use Java have a look at my [Android app](https://github.com/cnvx/argon/blob/master/app/src/main/java/com/example/cnvx/argon/CobaltClassifier.java) for an example on using the [TensorFlowInferenceInterface class](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/android/java/org/tensorflow/contrib/android/TensorFlowInferenceInterface.java), or read [this tutorial](https://medium.com/capital-one-developers/using-a-pre-trained-tensorflow-model-on-android-e747831a3d6).
+
+### Python
+
+TensorFlow offers the [SavedModel loader](https://www.tensorflow.org/api_docs/python/tf/saved_model/loader), read about it [here](https://www.tensorflow.org/programmers_guide/saved_model#apis_to_build_and_load_a_savedmodel).
+
+### Something else
+
+Protocol Buffers support a few [other languages](https://developers.google.com/protocol-buffers/docs/tutorials) and people are working on adding [more](https://github.com/google/protobuf/blob/master/docs/third_party.md).
 
 ## Acknowledgements
 
@@ -58,14 +74,10 @@ If you're interested in machine learning I recommend starting with [Neural Netwo
 
 [Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](https://arxiv.org/pdf/1502.03167v3.pdf) (Sergey Ioffe & Christian Szegedy, 2015).
 
-Magnus Erik Hvass Pedersen and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials), in particular his download and data augmentation code.
+Magnus Pedersen and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials), in particular his download and data augmentation code.
 
-A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton for creating and maintaining the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  
+A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey E. Hinton for creating and maintaining the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  
 [Learning Multiple Layers of Features from Tiny Images](https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf) (Alex Krizhevsky, 2009).
-
-## Disclaimer
-
-This is **alpha** code! I wouldn't use it for anything important.
 
 ## License
 
