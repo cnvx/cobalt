@@ -93,7 +93,7 @@ def convert_images(unconverted):
 def load_data(filename):
     data = unpickle(filename)
 
-    # Get the unconverted images, 'data' is a bytes literal
+    # Get the unconverted images as byte literals
     unconverted = data[b'data']
 
     # 'labels' are byte literals
@@ -358,7 +358,8 @@ with tf.name_scope('third_fully_connected_layer'):
     W_conn3 = weight_variable([192, 10], 'W_conn3', False)
     b_conn3 = bias_variable([10], 'b_conn3')
     
-    conn3 = tf.add(tf.matmul(relu4, W_conn3), b_conn3, 'output')
+    conn3 = tf.add(tf.matmul(relu4, W_conn3), b_conn3)
+    soft = tf.nn.softmax(conn3, name = 'output')
     
 ''' Additional functions and ops '''
 
@@ -374,7 +375,7 @@ with tf.name_scope('train'):
 # Accuracy
 with tf.name_scope('network_accuracy'):
     with tf.name_scope('correct_prediction'):
-        correct_prediction = tf.equal(tf.argmax(conn3, 1), tf.argmax(y_actual, 1))
+        correct_prediction = tf.equal(tf.argmax(soft, 1), tf.argmax(y_actual, 1))
     with tf.name_scope('accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('training_accuracy', accuracy)

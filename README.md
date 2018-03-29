@@ -1,6 +1,6 @@
 # cobalt
 
-Convolutional neural network for image-based object classification.
+Convolutional neural network for image-based object classification. Used in [this Android app](https://github.com/cnvx/argon).
 
 ## About
 
@@ -21,7 +21,7 @@ Windows:
 
 `./cobalt.py --train 20000`  
 `./cobalt.py --accuracy`  
-`./cobalt.py -t 50000 -a --batch 64`
+`./cobalt.py -t 50000 --export network`
 
 ### Visualizing
 
@@ -56,7 +56,7 @@ To use this with your own code, save the trained network as a [.pb file](https:/
 
 ### Android
 
-If you use Java have a look at my [Android app](https://github.com/cnvx/argon/blob/master/app/src/main/java/com/example/cnvx/argon/CobaltClassifier.java) for an example on using the [TensorFlowInferenceInterface class](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/android/java/org/tensorflow/contrib/android/TensorFlowInferenceInterface.java), or read [this tutorial](https://medium.com/capital-one-developers/using-a-pre-trained-tensorflow-model-on-android-e747831a3d6).
+If you use Java have a look at [this class](https://github.com/cnvx/argon/blob/master/app/src/main/java/com/example/cnvx/argon/CobaltClassifier.java) from my app for an example on using the [TensorFlowInferenceInterface](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/android/java/org/tensorflow/contrib/android/TensorFlowInferenceInterface.java), or read [this tutorial](https://medium.com/capital-one-developers/using-a-pre-trained-tensorflow-model-on-android-e747831a3d6).
 
 ### Python
 
@@ -68,20 +68,15 @@ Protocol Buffers support a few [other languages](https://developers.google.com/p
 
 ## Acknowledgements
 
-If you're interested in machine learning I recommend starting with [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com) by Michael Nielsen.
-
-[ImageNet Classification with Deep Convolutional Neural Networks](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf) (Alex Krizhevsky, Ilya Sutskever & Geoffrey E. Hinton, 2012).
-
-[Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](https://arxiv.org/pdf/1502.03167v3.pdf) (Sergey Ioffe & Christian Szegedy, 2015).
-
-Magnus Pedersen and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials), in particular his download and data augmentation code.
-
+If you're interested in machine learning I recommend starting with [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com) by Michael Nielsen.  
+[ImageNet Classification with Deep Convolutional Neural Networks](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf) (Alex Krizhevsky, Ilya Sutskever & Geoffrey E. Hinton, 2012).  
+[Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](https://arxiv.org/pdf/1502.03167v3.pdf) (Sergey Ioffe & Christian Szegedy, 2015).  
+Magnus Pedersen and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials), in particular his download and data augmentation code.  
 A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey E. Hinton for creating and maintaining the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  
 [Learning Multiple Layers of Features from Tiny Images](https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf) (Alex Krizhevsky, 2009).
 
 ## License
 
-The [MIT License](LICENSE).
-
+This repository uses the [MIT License](LICENSE).  
 Data set download and augmentation functions belong to [Magnus Pedersen](https://github.com/Hvass-Labs/TensorFlow-Tutorials/blob/master/LICENSE).  
 TensorFlow is released under the [Apache License, Version 2.0](https://github.com/tensorflow/tensorflow/blob/master/LICENSE).
