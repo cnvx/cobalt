@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 import tensorflow as tf
 import numpy as np
@@ -11,6 +11,7 @@ import tarfile
 import pickle
 import glob
 import shutil
+import hashlib
 import argparse as arg
 
 ''' Argument parsing '''
@@ -54,9 +55,8 @@ learning_decay_frequency = 5000
 
 ''' Functions for getting the CIFAR-10 data set '''
 
-# Where to get the data set from
 data_url = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
-
+data_hash = 'c58f30108f718f92721af3b95e74349a'
 data_path = './CIFAR-10/'
 
 # Image dimensions
@@ -128,12 +128,14 @@ def download_data_set():
     filename = data_url.split('/')[-1]
     file_path = os.path.join(data_path, filename)
 
-    # Check if the file already exists
-    if not os.path.exists(file_path):
-        # Check if the download directory exists
-        if not os.path.exists(data_path):
-            os.makedirs(data_path)
-        
+    # Verify the integrity of the archive
+    if not os.path.exists(file_path) or hashlib.md5(open(file_path, 'rb').read()).hexdigest() != data_hash:
+        # Delete the download directory if it exists
+        if os.path.exists(data_path):
+            shutil.rmtree(data_path, ignore_errors = True)
+
+        os.makedirs(data_path)
+
         # Download the data set
         file_path, _ = urllib.request.urlretrieve(url = data_url,
                                                   filename = file_path,
