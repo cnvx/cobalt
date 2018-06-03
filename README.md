@@ -5,9 +5,9 @@ Convolutional neural network for image-based object classification, used in [thi
 ## About
 
 Based on the [AlexNet architecture](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf), training and validation data taken from the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  
-Capable of reaching about 84% accuracy after 150000 training steps.
+Capable of reaching about 84% accuracy after 175000 training steps.
 
-If you run out of memory try using a smaller batch size (512 by default).
+If you run out of memory try using a smaller batch size, for best results use [powers of 2](https://en.wikipedia.org/wiki/Power_of_two).
 
 ## Usage
 

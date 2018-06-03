@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__version__ = '1.0.2'
+__version__ = '1.1.0'
 
 import tensorflow as tf
 import numpy as np
@@ -16,7 +16,7 @@ import argparse as arg
 
 ''' Argument parsing '''
 
-format = lambda prog: arg.HelpFormatter(prog, max_help_position = 79)
+format = lambda prog: arg.HelpFormatter(prog, max_help_position = 77)
 parser = arg.ArgumentParser(formatter_class = format)
 
 parser.add_argument('-t', '--train', metavar = 'steps', dest = 'times_to_train', type = int,
@@ -48,10 +48,12 @@ if __name__ == '__main__':
 
 ''' Hyperparameters '''
 
-initial_weight_decay = 512
 initial_learning_rate = 0.2
 learning_rate_decay = 0.97
 learning_decay_frequency = 5000
+initial_weight_decay = 5e2
+moving_average_decay = 0.5
+gaussian_noise_deviation = 0.02
 
 ''' Functions for getting the CIFAR-10 data set '''
 
@@ -147,7 +149,6 @@ def download_data_set():
         tarfile.open(name = file_path, mode = 'r:gz').extractall(data_path)
 
         print('\rFiles extracted    ')
-
     else:
         print('Data has already been downloaded and extracted')
 
@@ -193,12 +194,16 @@ def load_test_data():
 # If data augmentation is enabled make random modifications, if not just crop it
 def process_single_image(image, is_training_data):
     if is_training_data:
-        image = tf.random_crop(image, size = [image_size_cropped, image_size_cropped, number_of_channels])
+        gaussian_noise = tf.random_normal(shape = [image_size_cropped, image_size_cropped, number_of_channels],
+                                          mean = 0.0, stddev = gaussian_noise_deviation, dtype = tf.float32)
+
         image = tf.image.random_flip_left_right(image)
         image = tf.image.random_hue(image, max_delta = 0.05)
         image = tf.image.random_contrast(image, lower = 0.3, upper = 1.0)
         image = tf.image.random_saturation(image, lower = 0.0, upper = 2.0)
         image = tf.image.random_brightness(image, max_delta = 0.2)
+        image = tf.random_crop(image, size = [image_size_cropped, image_size_cropped, number_of_channels])
+        image = tf.add(image, gaussian_noise, 'add_gaussian_noise')
 
         # Stop tf.image.random_contrast() from outputting extreme values
         image = tf.minimum(image, 1.0)
@@ -246,7 +251,7 @@ with tf.name_scope('learning_rate'):
 
 ''' Functions used in the neural network '''
 
-# Create weight variable using Xavier initialization
+# Create weight variable using Xavier initialisation
 def weight_variable(shape, name, decay):
     xavier = tf.contrib.layers.xavier_initializer(uniform = False)
     variable = tf.get_variable(name, shape = shape, initializer = xavier)
@@ -272,10 +277,10 @@ def convolve(x, W):
 def max_pool(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'VALID')
 
-# Batch normalization
+# Batch normalisation
 def batch_norm(x, depth, is_training):
     mean_batch, variance_batch = tf.nn.moments(x, [0, 1, 2], name = 'batch_mean_variance_calculation')
-    moving_average = tf.train.ExponentialMovingAverage(decay = 0.5)
+    moving_average = tf.train.ExponentialMovingAverage(decay = moving_average_decay)
     
     def mean_variance_update():
         moving_average_op = moving_average.apply([mean_batch, variance_batch])
@@ -305,14 +310,14 @@ with tf.name_scope('first_convolutional_layer'):
     
     # Convolve the input with the weights and add the biases
     conv1 = convolve(x, W_conv1) + b_conv1
-    
+
     # Apply the rectified linear unit function
     relu1 = tf.nn.relu(conv1)
     
     # Apply max pooling, reducing the image size to 12x12 pixels
     pool1 = max_pool(relu1)
-    
-    # Apply batch normalization
+
+    # Apply batch normalisation
     batch1 = batch_norm(pool1, 64, is_training)
 
 # Second convolutional layer
@@ -372,7 +377,7 @@ with tf.name_scope('network_accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('training_accuracy', accuracy)
 
-# Initialization op
+# Initialisation op
 init_op = tf.global_variables_initializer()
 
 # Save and restore op
@@ -381,30 +386,43 @@ saver = tf.train.Saver()
 def main():
     args = parser.parse_args()
 
+    # Save locations
+    save_location = os.path.join(args.save_dir, 'cobalt.ckpt')
+    log_directory = os.path.join(args.save_dir, 'log')
+
     # Display help if no arguments are provided
     if len(sys.argv) == 1:
         parser.print_help()
         return
 
-    if args.times_to_train != 0 or args.accuracy == True:
+    if args.times_to_train > 0 or args.accuracy == True:
         # Download the data set
         download_data_set()
 
         # Load the data
         images_train, labels_train = load_training_data()
         images_test, labels_test = load_test_data()
+    elif args.times_to_train < 0:
+        print('Training steps must not be negative, specify a new number with --train')
 
-    # Save locations
-    save_location = os.path.join(args.save_dir, 'cobalt.ckpt')
-    log_directory = os.path.join(args.save_dir, 'log')
-        
     ''' Train the network '''
 
     # Start the session
     with tf.Session() as sess:
         sess.run(init_op)
 
-        if args.times_to_train != 0 and (glob.glob(save_location + '*') == [] or args.overwrite):
+        if args.times_to_train > 0 and (glob.glob(save_location + '*') == [] or args.overwrite):
+            print('Initialising neural network with the following hyperparameters:\n'
+                  '  Initial learning rate: {}\n'
+                  '  Learning rate decay: {}\n'
+                  '  Learning rate decay frequency: {}\n'
+                  '  Initial weight decay: {:g}\n'
+                  '  Exponential moving average decay: {}\n'
+                  '  Gaussian noise deviation: {}\n'
+                  '  Batch size: {}'
+                  .format(initial_learning_rate, learning_rate_decay, learning_decay_frequency, initial_weight_decay,
+                          moving_average_decay, gaussian_noise_deviation, args.batch_size))
+
             # Delete the old logs if they exist
             if glob.glob(log_directory):
                 shutil.rmtree(log_directory, ignore_errors = True)
@@ -453,7 +471,7 @@ def main():
             saver.save(sess, save_location)
             print('Network saved to {}'.format(save_location))
 
-        elif args.times_to_train != 0:
+        elif args.times_to_train > 0:
             print('Found saved network at {}, pick a new save location or use --overwrite'.format(save_location))
 
         if args.accuracy and glob.glob(save_location + '*') != []:
@@ -487,7 +505,7 @@ def main():
 
             graph_data = export_sess.graph.as_graph_def()
 
-            # Fix bug related to batch normalization
+            # Fix bug related to batch normalisation
             for node in graph_data.node:
                 if node.op == 'RefSwitch':
                     node.op = 'Switch'
