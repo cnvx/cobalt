@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__version__ = '1.1.0'
+__version__ = '2.0.0'
 
 import tensorflow as tf
 import numpy as np
@@ -16,17 +16,19 @@ import argparse as arg
 
 ''' Argument parsing '''
 
-format = lambda prog: arg.HelpFormatter(prog, max_help_position = 77)
-parser = arg.ArgumentParser(formatter_class = format)
+parser_format = lambda prog: arg.HelpFormatter(prog, max_help_position = 79)
+parser = arg.ArgumentParser(formatter_class = parser_format)
 
 parser.add_argument('-t', '--train', metavar = 'steps', dest = 'times_to_train', type = int,
                     default = 0, help = 'how many times to train')
-parser.add_argument('-a', '--accuracy', action = 'store_true', default = False,
-                    help = 'check network validation accuracy')
 parser.add_argument('-o', '--overwrite', action = 'store_true', default = False,
                     help = 'overwrite saved network data')
 parser.add_argument('-b', '--batch', metavar = 'size', dest = 'batch_size', type = int,
-                    default = 512, help = 'batch size used during training')
+                    default = 128, help = 'batch size used during training')
+parser.add_argument('-a', '--accuracy', action = 'store_true', default = False,
+                    help = 'check network validation accuracy')
+parser.add_argument('--accuracy-batch', metavar = 'size', dest = 'accuracy_batch_size', type = int,
+                    default = 1000, help = 'batch size used during accuracy calculation')
 parser.add_argument('-s', '--save', metavar = 'directory', dest = 'save_dir', default = 'data',
                     help = 'logs and trained network save location')
 parser.add_argument('-e', '--export', metavar = 'name', dest = 'export',
@@ -48,40 +50,37 @@ if __name__ == '__main__':
 
 ''' Hyperparameters '''
 
-initial_learning_rate = 0.2
-learning_rate_decay = 0.97
+initial_learning_rate = 0.1
+learning_rate_decay = 0.98
 learning_decay_frequency = 5000
 initial_weight_decay = 5e2
-moving_average_decay = 0.5
-gaussian_noise_deviation = 0.02
+moving_average_decay = 0.4
+widening_factor = 12
+data_augmentation = True
+gaussian_noise_deviation = 0.002
 
-''' Functions for getting the CIFAR-10 data set '''
+''' Functions for getting the CIFAR-100 data set '''
 
-data_url = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
-data_hash = 'c58f30108f718f92721af3b95e74349a'
-data_path = './CIFAR-10/'
+data_url = 'https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz'
+data_hash = 'eb9058c3a382ffc7106e4002c42a8d85'
+data_path = './CIFAR-100/'
 
 # Image dimensions
 image_size = 32
-image_size_cropped = 24
 
 # Colour channels
 number_of_channels = 3
 
 # Possible objects
-number_of_classes = 10
-
-number_of_files_train = 5
-number_of_files_test = 1
-images_per_file = 10000
+number_of_classes = 100
 
 # Total number of images
-number_of_images_train = number_of_files_train * images_per_file
-number_of_images_test = number_of_files_test * images_per_file
+number_of_images_train = number_of_classes * 500
+number_of_images_test = number_of_classes * 100
 
 # Get full file path, return directory if called with no filename
 def get_file_path(filename = ''):
-    return os.path.join(data_path, 'cifar-10-batches-py/', filename)
+    return os.path.join(data_path, 'cifar-100-python', filename)
     
 def unpickle(filename):
     file_path = get_file_path(filename)
@@ -92,7 +91,7 @@ def unpickle(filename):
 
     return data
 
-# Convert from CIFAR-10 format to 4 dimensional array
+# Convert from CIFAR-100 format to 4 dimensional array
 def convert_images(unconverted):
     float_array = np.array(unconverted, dtype = float) / 255.0
 
@@ -102,19 +101,18 @@ def convert_images(unconverted):
 
     return images
 
+# Return a one hot encoded 2 dimensional array of class numbers and labels
+def one_hot_encoded(class_numbers, number_of_classes):
+    return np.eye(number_of_classes, dtype = float)[class_numbers]
+
 # Load pickled data and return converted images and their class numbers
 def load_data(filename):
     data = unpickle(filename)
 
-    # Get the unconverted images as byte literals
-    unconverted = data[b'data']
+    images = convert_images(data[b'data'])
+    class_numbers = np.array(data[b'fine_labels'])
 
-    # 'labels' are byte literals
-    class_numbers = np.array(data[b'labels'])
-
-    images = convert_images(unconverted)
-
-    return images, class_numbers
+    return images, one_hot_encoded(class_numbers, number_of_classes)
 
 # Download and extract the data set if it doesn't already exist
 def download_data_set():
@@ -152,71 +150,56 @@ def download_data_set():
     else:
         print('Data has already been downloaded and extracted')
 
-# Return a one hot encoded 2 dimensional array of class numbers and labels
-def one_hot_encoded(class_numbers, number_of_classes = None):
-    if number_of_classes is None:
-        number_of_classes = np.max(class_numbers + 1)
-        
-    return np.eye(number_of_classes, dtype = float)[class_numbers]
-    
-# Load all the training data
-def load_training_data():
+''' Variables and placeholders for the neural network '''
 
-    # Preallocate arrays, helps with efficiency
-    images = np.zeros(shape = [number_of_images_train, image_size, image_size, number_of_channels], dtype = float)
-    class_numbers = np.zeros(shape = [number_of_images_train], dtype = int)
+# Input images for the neural network
+x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'x')
 
-    start_at = 0
+# Real lables associated with each image
+y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
 
-    # Load each data file
-    for i in range(number_of_files_train):
-        images_batch, class_numbers_batch = load_data(filename = 'data_batch_' + str(i + 1))
-        number_of_images_in_batch = len(images_batch)
+# Is the network training or not
+is_training = tf.placeholder_with_default(False, shape = (), name = 'is_training')
 
-        end = start_at + number_of_images_in_batch
-        
-        # Populate arrays
-        images[start_at:end, :] = images_batch
-        class_numbers[start_at:end] = class_numbers_batch
-                
-        # Start where the last run ended
-        start_at = end
+# Is data augmentation enabled
+augment = tf.placeholder_with_default(False, shape = (), name = 'augment')
 
-    return images, one_hot_encoded(class_numbers = class_numbers, number_of_classes = number_of_classes)
-
-# Load all the validation data
-def load_test_data():
-    images, class_numbers = load_data(filename = 'test_batch')
-    return images, one_hot_encoded(class_numbers = class_numbers, number_of_classes = number_of_classes)
+# Learning rate
+with tf.name_scope('learning_rate'):
+    learning_rate = tf.placeholder(tf.float32, shape = [])
+    tf.summary.scalar('learning_rate', learning_rate)
 
 ''' Image processing functions '''
 
-# If data augmentation is enabled make random modifications, if not just crop it
-def process_single_image(image, is_training_data):
-    if is_training_data:
-        gaussian_noise = tf.random_normal(shape = [image_size_cropped, image_size_cropped, number_of_channels],
+# If data augmentation is enabled make random modifications
+def process_single_image(image, augment):
+    if augment:
+        gaussian_noise = tf.random_normal(shape = [image_size, image_size, number_of_channels],
                                           mean = 0.0, stddev = gaussian_noise_deviation, dtype = tf.float32)
 
+        image = tf.pad(image, [[2, 2], [2, 2], [0, 0]], 'SYMMETRIC')
+        image = tf.random_crop(image, size = [image_size, image_size, number_of_channels])
         image = tf.image.random_flip_left_right(image)
         image = tf.image.random_hue(image, max_delta = 0.05)
         image = tf.image.random_contrast(image, lower = 0.3, upper = 1.0)
         image = tf.image.random_saturation(image, lower = 0.0, upper = 2.0)
         image = tf.image.random_brightness(image, max_delta = 0.2)
-        image = tf.random_crop(image, size = [image_size_cropped, image_size_cropped, number_of_channels])
         image = tf.add(image, gaussian_noise, 'add_gaussian_noise')
 
         # Stop tf.image.random_contrast() from outputting extreme values
         image = tf.minimum(image, 1.0)
         image = tf.maximum(image, 0.0)
-    else:
-        image = tf.image.resize_image_with_crop_or_pad(image, target_height = image_size_cropped,
-                                                       target_width = image_size_cropped)
 
     return image
 
-def process_images(images, is_training_data):
-    images = tf.map_fn(lambda image: process_single_image(image, is_training_data), images)
+def process_images(images, augment):
+    images = tf.map_fn(lambda image: process_single_image(image, augment), images)
     return images
+
+# Data augmentation
+with tf.name_scope('data_augmentation'):
+    with tf.device('/cpu:0'):
+        proc = tf.cond(augment, lambda: process_images(x, True), lambda: process_images(x, False))
 
 # Get random batch of images and labels
 def random_batch(images, labels, batch_size, validation = False):
@@ -230,29 +213,10 @@ def random_batch(images, labels, batch_size, validation = False):
     
     return x_batch, y_batch
 
-''' Variables and placeholders for the neural network '''
-
-# Input images for the neural network
-x = tf.placeholder(tf.float32, shape = [None, image_size_cropped, image_size_cropped, number_of_channels], name = 'x')
-
-# Real lables associated with each image
-y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
-
-# Images used as input during data augmentation
-raw = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_channels], name = 'raw')
-
-# Is the network training or not
-is_training = tf.placeholder_with_default(False, shape = (), name = 'is_training')
-
-# Learning rate
-with tf.name_scope('learning_rate'):
-    learning_rate = tf.placeholder(tf.float32, shape = [])
-    tf.summary.scalar('learning_rate', learning_rate)
-
-''' Functions used in the neural network '''
+''' Functions for creating the neural network '''
 
 # Create weight variable using Xavier initialisation
-def weight_variable(shape, name, decay):
+def weight_variable(shape, decay, name):
     xavier = tf.contrib.layers.xavier_initializer(uniform = False)
     variable = tf.get_variable(name, shape = shape, initializer = xavier)
 
@@ -269,16 +233,17 @@ def weight_variable(shape, name, decay):
 def bias_variable(shape, name):
     return tf.get_variable(name, shape = shape, initializer = tf.constant_initializer(0.0))
 
-# Compute 2 dimensional convolution
-def convolve(x, W):
-    return tf.nn.conv2d(x, W, strides = [1, 1, 1, 1], padding = 'SAME')
+# Convolutional layer
+def conv_layer(x, filter_size, stride, in_filters, out_filters, layer):
+    W = weight_variable([filter_size, filter_size, in_filters, out_filters], True, 'weight_' + layer)
+    b = bias_variable([out_filters], 'bias_' + layer)
 
-# Max pooling
-def max_pool(x):
-    return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'VALID')
+    convolved = tf.nn.conv2d(x, W, strides = [1, stride, stride, 1], padding = 'SAME')
+
+    return convolved + b
 
 # Batch normalisation
-def batch_norm(x, depth, is_training):
+def batch_norm_layer(x, depth, is_training):
     mean_batch, variance_batch = tf.nn.moments(x, [0, 1, 2], name = 'batch_mean_variance_calculation')
     moving_average = tf.train.ExponentialMovingAverage(decay = moving_average_decay)
     
@@ -289,7 +254,7 @@ def batch_norm(x, depth, is_training):
         
     mean, variance = tf.cond(is_training, mean_variance_update, lambda: (moving_average.average(mean_batch),
                                                                          moving_average.average(variance_batch)))
-    
+
     # Also known as offset and scale
     beta = tf.Variable(tf.constant(0.0, shape = [depth]), name = 'beta', trainable = True)
     gamma = tf.Variable(tf.constant(1.0, shape = [depth]), name = 'gamma', trainable = True)
@@ -298,71 +263,70 @@ def batch_norm(x, depth, is_training):
 
 ''' Neural network architecture '''
 
-# Prepare the images
-with tf.name_scope('image_processing_layer'):
-    with tf.device('/cpu:0'):
-        proc = tf.cond(is_training, lambda: process_images(raw, True), lambda: process_images(raw, False))
+# First residual block
+# Input: ?x32x32x3
+# Output: ?x32x32x16
+with tf.name_scope('first_residual_block'):
+    conv1 = conv_layer(x, 3, 1, number_of_channels, 16, 'conv1')
+    batch1 = batch_norm_layer(conv1, 16, is_training)
+    relu1 = tf.nn.relu(batch1)
 
-# First convolutional layer
-with tf.name_scope('first_convolutional_layer'):
-    W_conv1 = weight_variable([5, 5, 3, 64], 'W_conv1', False)
-    b_conv1 = bias_variable([64], 'b_conv1')
+# Second residual block
+# Output: ?x32x32x192
+with tf.name_scope('second_residual_block'):
+    conv2 = conv_layer(relu1, 3, 1, 16, 16 * widening_factor, 'conv2')
+    batch2 = batch_norm_layer(conv2, 16 * widening_factor, is_training)
+    relu2 = tf.nn.relu(batch2)
+    conv3 = conv_layer(relu2, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv3')
+    batch3 = batch_norm_layer(conv3, 16 * widening_factor, is_training)
+    relu3 = tf.nn.relu(batch3)
+    short1 = relu3 + conv_layer(relu1, 1, 1, 16, 16 * widening_factor, 'short1')
     
-    # Convolve the input with the weights and add the biases
-    conv1 = convolve(x, W_conv1) + b_conv1
+# Third residual block
+# Output: ?x16x16x384
+with tf.name_scope('third_residual_block'):
+    conv4 = conv_layer(short1, 3, 2, 16 * widening_factor, 32 * widening_factor, 'conv4')
+    batch4 = batch_norm_layer(conv4, 32 * widening_factor, is_training)
+    relu4 = tf.nn.relu(batch4)
+    conv5 = conv_layer(relu4, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv5')
+    batch5 = batch_norm_layer(conv5, 32 * widening_factor, is_training)
+    relu5 = tf.nn.relu(batch5)
+    short2 = relu5 + conv_layer(short1, 1, 2, 16 * widening_factor, 32 * widening_factor, 'short2')
 
-    # Apply the rectified linear unit function
-    relu1 = tf.nn.relu(conv1)
-    
-    # Apply max pooling, reducing the image size to 12x12 pixels
-    pool1 = max_pool(relu1)
+# Fourth residual block
+# Output: ?x8x8x768
+with tf.name_scope('fourth_residual_block'):
+    conv6 = conv_layer(short2, 3, 2, 32 * widening_factor, 64 * widening_factor, 'conv6')
+    batch6 = batch_norm_layer(conv6, 64 * widening_factor, is_training)
+    relu6 = tf.nn.relu(batch6)
+    conv7 = conv_layer(relu6, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv7')
+    batch7 = batch_norm_layer(conv7, 64 * widening_factor, is_training)
+    relu7 = tf.nn.relu(batch7)
+    short3 = relu7 + conv_layer(short2, 1, 2, 32 * widening_factor, 64 * widening_factor, 'short3')
 
-    # Apply batch normalisation
-    batch1 = batch_norm(pool1, 64, is_training)
+# Global average pooling layer
+# Output: ?x1x1x768
+with tf.name_scope('global_average_pooling_layer'):
+    avg_pool = tf.nn.pool(short3, [8, 8], 'AVG', padding = 'VALID')
 
-# Second convolutional layer
-with tf.name_scope('second_convolutional_layer'):
-    W_conv2 = weight_variable([3, 3, 64, 96], 'W_conv2', False)
-    b_conv2 = bias_variable([96], 'b_conv2')
-    
-    conv2 = convolve(batch1, W_conv2) + b_conv2
-    relu2 = tf.nn.relu(conv2)
-    batch2 = batch_norm(relu2, 96, is_training)
-    pool2 = max_pool(batch2)
-
-# First fully connected layer
-with tf.name_scope('first_fully_connected_layer'):
+# Fully connected layer
+# Output: ?x100
+with tf.name_scope('fully_connected_layer'):
     # Flatten the tensor into 1 dimension
-    pool2_flat = tf.reshape(pool2, [-1, 6 * 6 * 96])
+    flat = tf.reshape(avg_pool, [-1, 1 * 1 * 768])
     
     # Prepare the network variables
-    W_conn1 = weight_variable([6 * 6 * 96, 384], 'W_conn1', True)
-    b_conn1 = bias_variable([384], 'b_conn1')
+    W_conn = weight_variable([1 * 1 * 768, number_of_classes], True, 'weight_conn')
+    b_conn = bias_variable([number_of_classes], 'bias_conn')
     
-    conn1 = tf.matmul(pool2_flat, W_conn1) + b_conn1
-    relu3 = tf.nn.relu(conn1)
+    conn = tf.matmul(flat, W_conn) + b_conn
+    soft = tf.nn.softmax(conn, name = 'output')
     
-# Second fully connected layer
-with tf.name_scope('second_fully_connected_layer'):
-    W_conn2 = weight_variable([384, 192], 'W_conn2', True)
-    b_conn2 = bias_variable([192], 'b_conn2')
-    
-    conn2 = tf.matmul(relu3, W_conn2) + b_conn2
-    relu4 = tf.nn.relu(conn2)
-    
-# Output layer
-with tf.name_scope('third_fully_connected_layer'):
-    W_conn3 = weight_variable([192, number_of_classes], 'W_conn3', False)
-    b_conn3 = bias_variable([number_of_classes], 'b_conn3')
-    
-    conn3 = tf.add(tf.matmul(relu4, W_conn3), b_conn3)
-    soft = tf.nn.softmax(conn3, name = 'output')
-    
-''' Additional functions and ops '''
+''' Additional functions and operations '''
 
 # Cost function
 with tf.name_scope('cost_function'):
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels = y_actual, logits = conn3))
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels = y_actual, logits = conn))
     tf.summary.scalar('cost_function', cross_entropy)
 
 # Train step
@@ -395,33 +359,41 @@ def main():
         parser.print_help()
         return
 
-    if args.times_to_train > 0 or args.accuracy == True:
+    if args.times_to_train > 0 or args.accuracy == True or args.accuracy_batch_size != 1000:
         # Download the data set
         download_data_set()
 
         # Load the data
-        images_train, labels_train = load_training_data()
-        images_test, labels_test = load_test_data()
+        images_train, labels_train = load_data('train')
+        images_test, labels_test = load_data('test')
     elif args.times_to_train < 0:
         print('Training steps must not be negative, specify a new number with --train')
 
-    ''' Train the network '''
+    ''' Create the neural network '''
 
     # Start the session
     with tf.Session() as sess:
         sess.run(init_op)
 
         if args.times_to_train > 0 and (glob.glob(save_location + '*') == [] or args.overwrite):
+            if data_augmentation:
+                data_augmentation_status = 'enabled'
+            else:
+                data_augmentation_status = 'disabled'
+
             print('Initialising neural network with the following hyperparameters:\n'
                   '  Initial learning rate: {}\n'
                   '  Learning rate decay: {}\n'
                   '  Learning rate decay frequency: {}\n'
                   '  Initial weight decay: {:g}\n'
                   '  Exponential moving average decay: {}\n'
+                  '  Widening factor: {}\n'
+                  '  Data augmentation: {}\n'
                   '  Gaussian noise deviation: {}\n'
                   '  Batch size: {}'
                   .format(initial_learning_rate, learning_rate_decay, learning_decay_frequency, initial_weight_decay,
-                          moving_average_decay, gaussian_noise_deviation, args.batch_size))
+                          moving_average_decay, widening_factor, data_augmentation_status, gaussian_noise_deviation,
+                          args.batch_size))
 
             # Delete the old logs if they exist
             if glob.glob(log_directory):
@@ -444,7 +416,7 @@ def main():
 
                 # Perform data augmentation
                 x_train, y_actual_train = random_batch(images_train, labels_train, args.batch_size)
-                augmented = sess.run(proc, {raw: x_train, is_training: True})
+                augmented = sess.run(proc, {x: x_train, augment: data_augmentation})
 
                 feed_dict_train = {x: augmented, y_actual: y_actual_train, is_training: True, learning_rate: learn}
 
@@ -456,36 +428,39 @@ def main():
 
                 if i % 100 == 0:
                     x_test, y_actual_test = random_batch(images_test, labels_test, args.batch_size, True)
-                    resized = sess.run(proc, {raw: x_test})
-                    feed_dict_validation = {x: resized, y_actual: y_actual_test, is_training: False}
+                    feed_dict_validation = {x: x_test, y_actual: y_actual_test, is_training: False}
 
                     # Get the current validation accuracy
                     summary, validation_accuracy = sess.run([accuracy_summary, accuracy], feed_dict_validation)
                     validation_writer.add_summary(summary, i)
 
-                    if i % 1000 == 0:
-                        print('Training network (step {}/{}), current accuracy: {}%'.format(
-                            i, args.times_to_train, round(validation_accuracy * 100, 2)))
+                    print('Training network (step {}/{}), current accuracy: {}%'
+                          .format(i, args.times_to_train, round(validation_accuracy * 100, 2)))
 
             # Save the network variables to disk
             saver.save(sess, save_location)
             print('Network saved to {}'.format(save_location))
 
         elif args.times_to_train > 0:
-            print('Found saved network at {}, pick a new save location or use --overwrite'.format(save_location))
+            print('Found saved network in {}, pick a new save location or use --overwrite'.format(save_location))
 
-        if args.accuracy and glob.glob(save_location + '*') != []:
-            # Load the old network variables
-            saver.restore(sess, save_location)
-            print('Network loaded from {}'.format(save_location))
+        if args.accuracy or args.accuracy_batch_size != 1000 and glob.glob(save_location + '*') != []:
+            if args.accuracy_batch_size <= number_of_images_test:
+                # Load the old network variables
+                saver.restore(sess, save_location)
+                print('Network loaded from {}'.format(save_location))
 
-            # Get final accuracy
-            cropped = sess.run(proc, {raw: images_test})
-            feed_dict_final = {x: cropped, y_actual: labels_test}
-            sys.stdout.write('Getting accuracy...')
-            sys.stdout.flush()
-            print('\rNetwork accuracy: {}%'.format(round(accuracy.eval(feed_dict_final) * 100, 2)))
-        elif args.accuracy:
+                # Get final accuracy
+                feed_dict_final = {x: images_test[:args.accuracy_batch_size, :, :, :],
+                                   y_actual: labels_test[:args.accuracy_batch_size]}
+                print('Calculating accuracy based on {} validation images, increase this with --accuracy-batch'
+                      .format(args.accuracy_batch_size))
+                print('Network accuracy: {}%'.format(round(accuracy.eval(feed_dict_final) * 100, 2)))
+            else:
+                print('Batch size exceeds total number of validation images ({}), '
+                      'specify a smaller size with --accuracy-batch'
+                      .format(number_of_images_test))
+        elif args.accuracy or args.accuracy_batch_size != 1000:
             print('Could not find saved network, unable to check accuracy')
 
     ''' Export network for inference, using protocol buffers '''
@@ -522,7 +497,7 @@ def main():
                         del node.attr['use_locking']
 
             network = tf.graph_util.convert_variables_to_constants(export_sess, graph_data,
-                                                                   ['third_fully_connected_layer/output'])
+                                                                   ['fully_connected_layer/output'])
 
             # Export the network using protocol buffers
             with tf.gfile.GFile(export_file, 'wb') as exporter:

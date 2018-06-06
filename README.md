@@ -1,11 +1,10 @@
 # Cobalt Neural Network
 
-Convolutional neural network for image-based object classification, used in [this Android app](https://github.com/cnvx/argon).
+Wide residual neural network for image-based object classification, used in [this Android app](https://github.com/cnvx/argon).
 
 ## About
 
-Based on the [AlexNet architecture](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf), training and validation data taken from the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  
-Capable of reaching about 84% accuracy after 175000 training steps.
+Based on the [WRN architecture](https://arxiv.org/pdf/1605.07146.pdf), training and validation data taken from the [CIFAR-100 data set](https://www.cs.toronto.edu/~kriz/cifar.html).
 
 If you run out of memory try using a smaller batch size, for best results use [powers of 2](https://en.wikipedia.org/wiki/Power_of_two).
 
@@ -81,11 +80,12 @@ Protocol Buffers support a few [other languages](https://developers.google.com/p
 
 ## Acknowledgements
 
-If you're interested in machine learning I recommend starting with [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com) by Michael Nielsen.  
 [ImageNet Classification with Deep Convolutional Neural Networks](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf) (Alex Krizhevsky, Ilya Sutskever & Geoffrey E. Hinton, 2012).  
+[Deep Residual Learning for Image Recognition](https://arxiv.org/pdf/1512.03385.pdf) (Kaiming He, Xiangyu Zhang, Shaoqing Ren & Jian Sun, 2015)  
+[Wide Residual Networks](https://arxiv.org/pdf/1605.07146.pdf) (Sergey Zagoruyko & Nikos Komodakis, 2016).  
 [Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](https://arxiv.org/pdf/1502.03167v3.pdf) (Sergey Ioffe & Christian Szegedy, 2015).  
-Magnus Pedersen and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials), in particular his download and data augmentation code.  
-A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey E. Hinton for creating and maintaining the [CIFAR-10 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  
+Magnus Pedersen and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials).  
+A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey E. Hinton for maintaining the [CIFAR-100 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  
 [Learning Multiple Layers of Features from Tiny Images](https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf) (Alex Krizhevsky, 2009).
 
 ## License
