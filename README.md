@@ -81,8 +81,9 @@ Protocol Buffers support a few [other languages](https://developers.google.com/p
 ## Acknowledgements
 
 [ImageNet Classification with Deep Convolutional Neural Networks](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf) (Alex Krizhevsky, Ilya Sutskever & Geoffrey E. Hinton, 2012).  
-[Deep Residual Learning for Image Recognition](https://arxiv.org/pdf/1512.03385.pdf) (Kaiming He, Xiangyu Zhang, Shaoqing Ren & Jian Sun, 2015)  
-[Wide Residual Networks](https://arxiv.org/pdf/1605.07146.pdf) (Sergey Zagoruyko & Nikos Komodakis, 2016).  
+[Wide Residual Networks](https://arxiv.org/pdf/1605.07146.pdf) (Sergey Zagoruyko & Nikos Komodakis, 2016).
+[A Method for Solving a Convex Programming Problem with Convergence Rate O(1/K2)](http://mpawankumar.info/teaching/cdt-big-data/nesterov83.pdf) (Yurii Nesterov, 1983).  
+[Deep Residual Learning for Image Recognition](https://arxiv.org/pdf/1512.03385.pdf) (Kaiming He, Xiangyu Zhang, Shaoqing Ren & Jian Sun, 2015).  
 [Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](https://arxiv.org/pdf/1502.03167v3.pdf) (Sergey Ioffe & Christian Szegedy, 2015).  
 Magnus Pedersen and his [excellent repository](https://github.com/Hvass-Labs/TensorFlow-Tutorials).  
 A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey E. Hinton for maintaining the [CIFAR-100 data set](https://www.cs.toronto.edu/~kriz/cifar.html).  

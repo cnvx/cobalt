@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__version__ = '2.0.0'
+__version__ = '2.1.0'
 
 import tensorflow as tf
 import numpy as np
@@ -50,14 +50,14 @@ if __name__ == '__main__':
 
 ''' Hyperparameters '''
 
-initial_learning_rate = 0.1
-learning_rate_decay = 0.98
-learning_decay_frequency = 5000
+initial_learning_rate = 0.01
+learning_rate_decay = 0.92
+learning_decay_frequency = 10000
+momentum = 0.9
 initial_weight_decay = 5e2
-moving_average_decay = 0.4
-widening_factor = 12
+moving_average_decay = 0.5
 data_augmentation = True
-gaussian_noise_deviation = 0.002
+widening_factor = 12
 
 ''' Functions for getting the CIFAR-100 data set '''
 
@@ -158,10 +158,7 @@ x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_
 # Real lables associated with each image
 y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
 
-# Is the network training or not
 is_training = tf.placeholder_with_default(False, shape = (), name = 'is_training')
-
-# Is data augmentation enabled
 augment = tf.placeholder_with_default(False, shape = (), name = 'augment')
 
 # Learning rate
@@ -174,9 +171,6 @@ with tf.name_scope('learning_rate'):
 # If data augmentation is enabled make random modifications
 def process_single_image(image, augment):
     if augment:
-        gaussian_noise = tf.random_normal(shape = [image_size, image_size, number_of_channels],
-                                          mean = 0.0, stddev = gaussian_noise_deviation, dtype = tf.float32)
-
         image = tf.pad(image, [[2, 2], [2, 2], [0, 0]], 'SYMMETRIC')
         image = tf.random_crop(image, size = [image_size, image_size, number_of_channels])
         image = tf.image.random_flip_left_right(image)
@@ -184,7 +178,6 @@ def process_single_image(image, augment):
         image = tf.image.random_contrast(image, lower = 0.3, upper = 1.0)
         image = tf.image.random_saturation(image, lower = 0.0, upper = 2.0)
         image = tf.image.random_brightness(image, max_delta = 0.2)
-        image = tf.add(image, gaussian_noise, 'add_gaussian_noise')
 
         # Stop tf.image.random_contrast() from outputting extreme values
         image = tf.minimum(image, 1.0)
@@ -263,75 +256,151 @@ def batch_norm_layer(x, depth, is_training):
 
 ''' Neural network architecture '''
 
-# First residual block
+# Input block
 # Input: ?x32x32x3
 # Output: ?x32x32x16
-with tf.name_scope('first_residual_block'):
+with tf.name_scope('input_block'):
     conv1 = conv_layer(x, 3, 1, number_of_channels, 16, 'conv1')
     batch1 = batch_norm_layer(conv1, 16, is_training)
     relu1 = tf.nn.relu(batch1)
 
-# Second residual block
+# First residual block
 # Output: ?x32x32x192
-with tf.name_scope('second_residual_block'):
+with tf.name_scope('first_residual_block'):
     conv2 = conv_layer(relu1, 3, 1, 16, 16 * widening_factor, 'conv2')
     batch2 = batch_norm_layer(conv2, 16 * widening_factor, is_training)
     relu2 = tf.nn.relu(batch2)
     conv3 = conv_layer(relu2, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv3')
     batch3 = batch_norm_layer(conv3, 16 * widening_factor, is_training)
     relu3 = tf.nn.relu(batch3)
+
+    # Shortcut connection with the previous block
     short1 = relu3 + conv_layer(relu1, 1, 1, 16, 16 * widening_factor, 'short1')
-    
-# Third residual block
-# Output: ?x16x16x384
-with tf.name_scope('third_residual_block'):
-    conv4 = conv_layer(short1, 3, 2, 16 * widening_factor, 32 * widening_factor, 'conv4')
-    batch4 = batch_norm_layer(conv4, 32 * widening_factor, is_training)
+
+# Second residual block
+# Output: ?x32x32x192
+with tf.name_scope('second_residual_block'):
+    conv4 = conv_layer(short1, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv4')
+    batch4 = batch_norm_layer(conv4, 16 * widening_factor, is_training)
     relu4 = tf.nn.relu(batch4)
-    conv5 = conv_layer(relu4, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv5')
-    batch5 = batch_norm_layer(conv5, 32 * widening_factor, is_training)
+    conv5 = conv_layer(relu4, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv5')
+    batch5 = batch_norm_layer(conv5, 16 * widening_factor, is_training)
     relu5 = tf.nn.relu(batch5)
-    short2 = relu5 + conv_layer(short1, 1, 2, 16 * widening_factor, 32 * widening_factor, 'short2')
+
+    short2 = relu5 + short1
+
+# Third residual block
+# Output: ?x32x32x192
+with tf.name_scope('third_residual_block'):
+    conv6 = conv_layer(short2, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv6')
+    batch6 = batch_norm_layer(conv6, 16 * widening_factor, is_training)
+    relu6 = tf.nn.relu(batch6)
+    conv7 = conv_layer(relu6, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv7')
+    batch7 = batch_norm_layer(conv7, 16 * widening_factor, is_training)
+    relu7 = tf.nn.relu(batch7)
+
+    short3 = relu7 + short2
 
 # Fourth residual block
-# Output: ?x8x8x768
+# Output: ?x16x16x384
 with tf.name_scope('fourth_residual_block'):
-    conv6 = conv_layer(short2, 3, 2, 32 * widening_factor, 64 * widening_factor, 'conv6')
-    batch6 = batch_norm_layer(conv6, 64 * widening_factor, is_training)
-    relu6 = tf.nn.relu(batch6)
-    conv7 = conv_layer(relu6, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv7')
-    batch7 = batch_norm_layer(conv7, 64 * widening_factor, is_training)
-    relu7 = tf.nn.relu(batch7)
-    short3 = relu7 + conv_layer(short2, 1, 2, 32 * widening_factor, 64 * widening_factor, 'short3')
+    conv8 = conv_layer(short3, 3, 2, 16 * widening_factor, 32 * widening_factor, 'conv8')
+    batch8 = batch_norm_layer(conv8, 32 * widening_factor, is_training)
+    relu8 = tf.nn.relu(batch8)
+    conv9 = conv_layer(relu8, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv9')
+    batch9 = batch_norm_layer(conv9, 32 * widening_factor, is_training)
+    relu9 = tf.nn.relu(batch9)
+
+    short4 = relu9 + conv_layer(short3, 1, 2, 16 * widening_factor, 32 * widening_factor, 'short4')
+
+# Fifth residual block
+# Output: ?x16x16x384
+with tf.name_scope('fifth_residual_block'):
+    conv10 = conv_layer(short4, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv10')
+    batch10 = batch_norm_layer(conv10, 32 * widening_factor, is_training)
+    relu10 = tf.nn.relu(batch10)
+    conv11 = conv_layer(relu10, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv11')
+    batch11 = batch_norm_layer(conv11, 32 * widening_factor, is_training)
+    relu11 = tf.nn.relu(batch11)
+
+    short5 = relu11 + short4
+
+# Sixth residual block
+# Output: ?x16x16x384
+with tf.name_scope('sixth_residual_block'):
+    conv12 = conv_layer(short5, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv12')
+    batch12 = batch_norm_layer(conv12, 32 * widening_factor, is_training)
+    relu12 = tf.nn.relu(batch12)
+    conv13 = conv_layer(relu12, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv13')
+    batch13 = batch_norm_layer(conv13, 32 * widening_factor, is_training)
+    relu13 = tf.nn.relu(batch13)
+
+    short6 = relu13 + short5
+
+# Seventh residual block
+# Output: ?x8x8x768
+with tf.name_scope('seventh_residual_block'):
+    conv14 = conv_layer(short6, 3, 2, 32 * widening_factor, 64 * widening_factor, 'conv14')
+    batch14 = batch_norm_layer(conv14, 64 * widening_factor, is_training)
+    relu14 = tf.nn.relu(batch14)
+    conv15 = conv_layer(relu14, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv15')
+    batch15 = batch_norm_layer(conv15, 64 * widening_factor, is_training)
+    relu15 = tf.nn.relu(batch15)
+
+    short7 = relu15 + conv_layer(short6, 1, 2, 32 * widening_factor, 64 * widening_factor, 'short7')
+
+# Eighth residual block
+# Output: ?x8x8x768
+with tf.name_scope('eighth_residual_block'):
+    conv16 = conv_layer(short7, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv16')
+    batch16 = batch_norm_layer(conv16, 64 * widening_factor, is_training)
+    relu16 = tf.nn.relu(batch16)
+    conv17 = conv_layer(relu16, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv17')
+    batch17 = batch_norm_layer(conv17, 64 * widening_factor, is_training)
+    relu17 = tf.nn.relu(batch17)
+
+    short8 = relu17 + short7
+
+# Ninth residual block
+# Output: ?x8x8x768
+with tf.name_scope('ninth_residual_block'):
+    conv18 = conv_layer(short8, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv18')
+    batch18 = batch_norm_layer(conv18, 64 * widening_factor, is_training)
+    relu18 = tf.nn.relu(batch18)
+    conv19 = conv_layer(relu18, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv19')
+    batch19 = batch_norm_layer(conv19, 64 * widening_factor, is_training)
+    relu19 = tf.nn.relu(batch19)
+
+    short9 = relu19 + short8
 
 # Global average pooling layer
 # Output: ?x1x1x768
 with tf.name_scope('global_average_pooling_layer'):
-    avg_pool = tf.nn.pool(short3, [8, 8], 'AVG', padding = 'VALID')
+    avg_pool = tf.nn.pool(short9, [8, 8], 'AVG', padding = 'VALID')
 
 # Fully connected layer
 # Output: ?x100
 with tf.name_scope('fully_connected_layer'):
     # Flatten the tensor into 1 dimension
     flat = tf.reshape(avg_pool, [-1, 1 * 1 * 768])
-    
+
     # Prepare the network variables
     W_conn = weight_variable([1 * 1 * 768, number_of_classes], True, 'weight_conn')
     b_conn = bias_variable([number_of_classes], 'bias_conn')
-    
+
     conn = tf.matmul(flat, W_conn) + b_conn
     soft = tf.nn.softmax(conn, name = 'output')
-    
+
 ''' Additional functions and operations '''
 
 # Cost function
 with tf.name_scope('cost_function'):
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels = y_actual, logits = conn))
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits = conn, labels = y_actual))
     tf.summary.scalar('cost_function', cross_entropy)
 
 # Train step
 with tf.name_scope('train'):
-    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
+    train_step = tf.train.MomentumOptimizer(learning_rate, momentum, use_nesterov = True).minimize(cross_entropy)
 
 # Accuracy
 with tf.name_scope('network_accuracy'):
@@ -360,10 +429,8 @@ def main():
         return
 
     if args.times_to_train > 0 or args.accuracy == True or args.accuracy_batch_size != 1000:
-        # Download the data set
         download_data_set()
 
-        # Load the data
         images_train, labels_train = load_data('train')
         images_test, labels_test = load_data('test')
     elif args.times_to_train < 0:
@@ -385,14 +452,14 @@ def main():
                   '  Initial learning rate: {}\n'
                   '  Learning rate decay: {}\n'
                   '  Learning rate decay frequency: {}\n'
+                  '  Momentum: {}\n'
                   '  Initial weight decay: {:g}\n'
                   '  Exponential moving average decay: {}\n'
-                  '  Widening factor: {}\n'
                   '  Data augmentation: {}\n'
-                  '  Gaussian noise deviation: {}\n'
+                  '  Widening factor: {}\n'
                   '  Batch size: {}'
-                  .format(initial_learning_rate, learning_rate_decay, learning_decay_frequency, initial_weight_decay,
-                          moving_average_decay, widening_factor, data_augmentation_status, gaussian_noise_deviation,
+                  .format(initial_learning_rate, learning_rate_decay, learning_decay_frequency, momentum,
+                          initial_weight_decay, moving_average_decay, data_augmentation_status, widening_factor,
                           args.batch_size))
 
             # Delete the old logs if they exist
@@ -434,8 +501,9 @@ def main():
                     summary, validation_accuracy = sess.run([accuracy_summary, accuracy], feed_dict_validation)
                     validation_writer.add_summary(summary, i)
 
-                    print('Training network (step {}/{}), current accuracy: {}%'
-                          .format(i, args.times_to_train, round(validation_accuracy * 100, 2)))
+                    if i % 1000 == 0:
+                        print('Training network (step {}/{}), current accuracy: {}%'
+                              .format(i, args.times_to_train, round(validation_accuracy * 100, 2)))
 
             # Save the network variables to disk
             saver.save(sess, save_location)
@@ -450,9 +518,10 @@ def main():
                 saver.restore(sess, save_location)
                 print('Network loaded from {}'.format(save_location))
 
+                x_final, y_actual_final = random_batch(images_test, labels_test, args.accuracy_batch_size, True)
+                feed_dict_final = {x: x_final, y_actual: y_actual_final, is_training: False}
+
                 # Get final accuracy
-                feed_dict_final = {x: images_test[:args.accuracy_batch_size, :, :, :],
-                                   y_actual: labels_test[:args.accuracy_batch_size]}
                 print('Calculating accuracy based on {} validation images, increase this with --accuracy-batch'
                       .format(args.accuracy_batch_size))
                 print('Network accuracy: {}%'.format(round(accuracy.eval(feed_dict_final) * 100, 2)))
@@ -473,7 +542,6 @@ def main():
             export_file = export_file + '.pb'
 
         with tf.Session(graph = tf.Graph()) as export_sess:
-
             # Load the saved network
             meta_saver = tf.train.import_meta_graph(save_location + '.meta', clear_devices = True)
             meta_saver.restore(export_sess, save_location)
