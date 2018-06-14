@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__version__ = '2.1.0'
+__version__ = '2.2.0'
 
 import tensorflow as tf
 import numpy as np
@@ -50,14 +50,15 @@ if __name__ == '__main__':
 
 ''' Hyperparameters '''
 
-initial_learning_rate = 0.01
-learning_rate_decay = 0.92
-learning_decay_frequency = 10000
+initial_learning_rate = 0.1
+learning_rate_decay = 0.2
+learning_decay_frequency = 23500
 momentum = 0.9
 initial_weight_decay = 5e2
 moving_average_decay = 0.5
 data_augmentation = True
 widening_factor = 12
+dropout_probability = 0.3
 
 ''' Functions for getting the CIFAR-100 data set '''
 
@@ -101,7 +102,7 @@ def convert_images(unconverted):
 
     return images
 
-# Return a one hot encoded 2 dimensional array of class numbers and labels
+# Return a one hot encoded two-dimensional dimensional array of class numbers and labels
 def one_hot_encoded(class_numbers, number_of_classes):
     return np.eye(number_of_classes, dtype = float)[class_numbers]
 
@@ -159,6 +160,7 @@ x = tf.placeholder(tf.float32, shape = [None, image_size, image_size, number_of_
 y_actual = tf.placeholder(tf.float32, shape = [None, number_of_classes], name = 'y_actual')
 
 is_training = tf.placeholder_with_default(False, shape = (), name = 'is_training')
+keep = tf.placeholder_with_default(float(1), shape = (), name = 'dropout_keep_probability')
 augment = tf.placeholder_with_default(False, shape = (), name = 'augment')
 
 # Learning rate
@@ -270,7 +272,8 @@ with tf.name_scope('first_residual_block'):
     conv2 = conv_layer(relu1, 3, 1, 16, 16 * widening_factor, 'conv2')
     batch2 = batch_norm_layer(conv2, 16 * widening_factor, is_training)
     relu2 = tf.nn.relu(batch2)
-    conv3 = conv_layer(relu2, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv3')
+    drop1 = tf.nn.dropout(relu2, keep)
+    conv3 = conv_layer(drop1, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv3')
     batch3 = batch_norm_layer(conv3, 16 * widening_factor, is_training)
     relu3 = tf.nn.relu(batch3)
 
@@ -283,7 +286,8 @@ with tf.name_scope('second_residual_block'):
     conv4 = conv_layer(short1, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv4')
     batch4 = batch_norm_layer(conv4, 16 * widening_factor, is_training)
     relu4 = tf.nn.relu(batch4)
-    conv5 = conv_layer(relu4, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv5')
+    drop2 = tf.nn.dropout(relu4, keep)
+    conv5 = conv_layer(drop2, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv5')
     batch5 = batch_norm_layer(conv5, 16 * widening_factor, is_training)
     relu5 = tf.nn.relu(batch5)
 
@@ -295,35 +299,38 @@ with tf.name_scope('third_residual_block'):
     conv6 = conv_layer(short2, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv6')
     batch6 = batch_norm_layer(conv6, 16 * widening_factor, is_training)
     relu6 = tf.nn.relu(batch6)
-    conv7 = conv_layer(relu6, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv7')
+    drop3 = tf.nn.dropout(relu6, keep)
+    conv7 = conv_layer(drop3, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv7')
     batch7 = batch_norm_layer(conv7, 16 * widening_factor, is_training)
     relu7 = tf.nn.relu(batch7)
 
     short3 = relu7 + short2
 
 # Fourth residual block
-# Output: ?x16x16x384
+# Output: ?x32x32x192
 with tf.name_scope('fourth_residual_block'):
-    conv8 = conv_layer(short3, 3, 2, 16 * widening_factor, 32 * widening_factor, 'conv8')
-    batch8 = batch_norm_layer(conv8, 32 * widening_factor, is_training)
+    conv8 = conv_layer(short3, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv8')
+    batch8 = batch_norm_layer(conv8, 16 * widening_factor, is_training)
     relu8 = tf.nn.relu(batch8)
-    conv9 = conv_layer(relu8, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv9')
-    batch9 = batch_norm_layer(conv9, 32 * widening_factor, is_training)
+    drop4 = tf.nn.dropout(relu8, keep)
+    conv9 = conv_layer(drop4, 3, 1, 16 * widening_factor, 16 * widening_factor, 'conv9')
+    batch9 = batch_norm_layer(conv9, 16 * widening_factor, is_training)
     relu9 = tf.nn.relu(batch9)
 
-    short4 = relu9 + conv_layer(short3, 1, 2, 16 * widening_factor, 32 * widening_factor, 'short4')
+    short4 = relu9 + short3
 
 # Fifth residual block
 # Output: ?x16x16x384
 with tf.name_scope('fifth_residual_block'):
-    conv10 = conv_layer(short4, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv10')
+    conv10 = conv_layer(short4, 3, 2, 16 * widening_factor, 32 * widening_factor, 'conv10')
     batch10 = batch_norm_layer(conv10, 32 * widening_factor, is_training)
     relu10 = tf.nn.relu(batch10)
-    conv11 = conv_layer(relu10, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv11')
+    drop5 = tf.nn.dropout(relu10, keep)
+    conv11 = conv_layer(drop5, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv11')
     batch11 = batch_norm_layer(conv11, 32 * widening_factor, is_training)
     relu11 = tf.nn.relu(batch11)
 
-    short5 = relu11 + short4
+    short5 = relu11 + conv_layer(short4, 1, 2, 16 * widening_factor, 32 * widening_factor, 'short5')
 
 # Sixth residual block
 # Output: ?x16x16x384
@@ -331,32 +338,35 @@ with tf.name_scope('sixth_residual_block'):
     conv12 = conv_layer(short5, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv12')
     batch12 = batch_norm_layer(conv12, 32 * widening_factor, is_training)
     relu12 = tf.nn.relu(batch12)
-    conv13 = conv_layer(relu12, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv13')
+    drop6 = tf.nn.dropout(relu12, keep)
+    conv13 = conv_layer(drop6, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv13')
     batch13 = batch_norm_layer(conv13, 32 * widening_factor, is_training)
     relu13 = tf.nn.relu(batch13)
 
     short6 = relu13 + short5
 
 # Seventh residual block
-# Output: ?x8x8x768
+# Output: ?x16x16x384
 with tf.name_scope('seventh_residual_block'):
-    conv14 = conv_layer(short6, 3, 2, 32 * widening_factor, 64 * widening_factor, 'conv14')
-    batch14 = batch_norm_layer(conv14, 64 * widening_factor, is_training)
+    conv14 = conv_layer(short6, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv14')
+    batch14 = batch_norm_layer(conv14, 32 * widening_factor, is_training)
     relu14 = tf.nn.relu(batch14)
-    conv15 = conv_layer(relu14, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv15')
-    batch15 = batch_norm_layer(conv15, 64 * widening_factor, is_training)
+    drop7 = tf.nn.dropout(relu14, keep)
+    conv15 = conv_layer(drop7, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv15')
+    batch15 = batch_norm_layer(conv15, 32 * widening_factor, is_training)
     relu15 = tf.nn.relu(batch15)
 
-    short7 = relu15 + conv_layer(short6, 1, 2, 32 * widening_factor, 64 * widening_factor, 'short7')
+    short7 = relu15 + short6
 
 # Eighth residual block
-# Output: ?x8x8x768
+# Output: ?x16x16x384
 with tf.name_scope('eighth_residual_block'):
-    conv16 = conv_layer(short7, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv16')
-    batch16 = batch_norm_layer(conv16, 64 * widening_factor, is_training)
+    conv16 = conv_layer(short7, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv16')
+    batch16 = batch_norm_layer(conv16, 32 * widening_factor, is_training)
     relu16 = tf.nn.relu(batch16)
-    conv17 = conv_layer(relu16, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv17')
-    batch17 = batch_norm_layer(conv17, 64 * widening_factor, is_training)
+    drop8 = tf.nn.dropout(relu16, keep)
+    conv17 = conv_layer(drop8, 3, 1, 32 * widening_factor, 32 * widening_factor, 'conv17')
+    batch17 = batch_norm_layer(conv17, 32 * widening_factor, is_training)
     relu17 = tf.nn.relu(batch17)
 
     short8 = relu17 + short7
@@ -364,24 +374,66 @@ with tf.name_scope('eighth_residual_block'):
 # Ninth residual block
 # Output: ?x8x8x768
 with tf.name_scope('ninth_residual_block'):
-    conv18 = conv_layer(short8, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv18')
+    conv18 = conv_layer(short8, 3, 2, 32 * widening_factor, 64 * widening_factor, 'conv18')
     batch18 = batch_norm_layer(conv18, 64 * widening_factor, is_training)
     relu18 = tf.nn.relu(batch18)
-    conv19 = conv_layer(relu18, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv19')
+    drop9 = tf.nn.dropout(relu18, keep)
+    conv19 = conv_layer(drop9, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv19')
     batch19 = batch_norm_layer(conv19, 64 * widening_factor, is_training)
     relu19 = tf.nn.relu(batch19)
 
-    short9 = relu19 + short8
+    short9 = relu19 + conv_layer(short8, 1, 2, 32 * widening_factor, 64 * widening_factor, 'short9')
+
+# Tenth residual block
+# Output: ?x8x8x768
+with tf.name_scope('tenth_residual_block'):
+    conv20 = conv_layer(short9, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv20')
+    batch20 = batch_norm_layer(conv20, 64 * widening_factor, is_training)
+    relu20 = tf.nn.relu(batch20)
+    drop10 = tf.nn.dropout(relu20, keep)
+    conv21 = conv_layer(drop10, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv21')
+    batch21 = batch_norm_layer(conv21, 64 * widening_factor, is_training)
+    relu21 = tf.nn.relu(batch21)
+
+    short10 = relu21 + short9
+
+# Eleventh residual block
+# Output: ?x8x8x768
+with tf.name_scope('eleventh_residual_block'):
+    conv22 = conv_layer(short10, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv22')
+    batch22 = batch_norm_layer(conv22, 64 * widening_factor, is_training)
+    relu22 = tf.nn.relu(batch22)
+    drop11 = tf.nn.dropout(relu22, keep)
+    conv23 = conv_layer(drop11, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv23')
+    batch23 = batch_norm_layer(conv23, 64 * widening_factor, is_training)
+    relu23 = tf.nn.relu(batch23)
+
+    short11 = relu23 + short10
+
+# Twelfth residual block
+# Output: ?x8x8x768
+with tf.name_scope('twelfth_residual_block'):
+    conv24 = conv_layer(short11, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv24')
+    batch24 = batch_norm_layer(conv24, 64 * widening_factor, is_training)
+    relu24 = tf.nn.relu(batch24)
+    drop12 = tf.nn.dropout(relu24, keep)
+    conv25 = conv_layer(drop12, 3, 1, 64 * widening_factor, 64 * widening_factor, 'conv25')
+    batch25 = batch_norm_layer(conv25, 64 * widening_factor, is_training)
+    relu25 = tf.nn.relu(batch25)
+
+    short12 = relu25 + short11
 
 # Global average pooling layer
 # Output: ?x1x1x768
 with tf.name_scope('global_average_pooling_layer'):
-    avg_pool = tf.nn.pool(short9, [8, 8], 'AVG', padding = 'VALID')
+    batch26 = batch_norm_layer(short12, 64 * widening_factor, is_training)
+    relu26 = tf.nn.relu(batch26)
+    avg_pool = tf.nn.pool(relu26, [8, 8], 'AVG', padding = 'VALID')
 
 # Fully connected layer
 # Output: ?x100
 with tf.name_scope('fully_connected_layer'):
-    # Flatten the tensor into 1 dimension
+    # Make the tensor one-dimensional
     flat = tf.reshape(avg_pool, [-1, 1 * 1 * 768])
 
     # Prepare the network variables
@@ -443,11 +495,6 @@ def main():
         sess.run(init_op)
 
         if args.times_to_train > 0 and (glob.glob(save_location + '*') == [] or args.overwrite):
-            if data_augmentation:
-                data_augmentation_status = 'enabled'
-            else:
-                data_augmentation_status = 'disabled'
-
             print('Initialising neural network with the following hyperparameters:\n'
                   '  Initial learning rate: {}\n'
                   '  Learning rate decay: {}\n'
@@ -457,9 +504,11 @@ def main():
                   '  Exponential moving average decay: {}\n'
                   '  Data augmentation: {}\n'
                   '  Widening factor: {}\n'
+                  '  Dropout probability: {}\n'
                   '  Batch size: {}'
                   .format(initial_learning_rate, learning_rate_decay, learning_decay_frequency, momentum,
-                          initial_weight_decay, moving_average_decay, data_augmentation_status, widening_factor,
+                          initial_weight_decay, moving_average_decay,
+                          'enabled' if data_augmentation == True else 'disabled', widening_factor, dropout_probability,
                           args.batch_size))
 
             # Delete the old logs if they exist
@@ -485,7 +534,8 @@ def main():
                 x_train, y_actual_train = random_batch(images_train, labels_train, args.batch_size)
                 augmented = sess.run(proc, {x: x_train, augment: data_augmentation})
 
-                feed_dict_train = {x: augmented, y_actual: y_actual_train, is_training: True, learning_rate: learn}
+                feed_dict_train = {x: augmented, y_actual: y_actual_train, is_training: True,
+                                   keep: dropout_probability, learning_rate: learn}
 
                 # Execute a training step
                 summary, _ = sess.run([merged, train_step], feed_dict_train)
