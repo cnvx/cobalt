@@ -1,6 +1,6 @@
 # Cobalt Neural Network
 
-Wide residual neural network for image-based object classification, used in [this Android app](https://github.com/cnvx/argon).
+Convolutional residual neural network for image-based object classification, used in [this Android app](https://github.com/cnvx/argon).
 
 ## About
 
@@ -95,3 +95,6 @@ A thanks to Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton for maintaining the
 
 This repository uses the [MIT License](LICENSE).  
 TensorFlow is released under the [Apache License, Version 2.0](https://github.com/tensorflow/tensorflow/blob/master/LICENSE).
+
+## Architecture
+![Neural network layers](layers.png)
