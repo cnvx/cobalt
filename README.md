@@ -1,3 +1,5 @@
+**This project has been moved to https://gitlab.com/archiekennedy/cobalt, consider this repository outdated.**
+
 # Cobalt Neural Network
 
 Convolutional residual neural network for image-based object classification, used in [this Android app](https://github.com/cnvx/argon).
